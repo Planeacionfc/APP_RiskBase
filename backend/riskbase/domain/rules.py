@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, Any
+from typing import Dict
 
 
 def insert_marks() -> Dict[str, str]:
@@ -294,22 +294,22 @@ def calculate_rango_obsolescencia(row: pd.Series) -> str:
     if status_cons != "OBSOLETO" or pd.isna(fecha_entrada) or pd.isna(fecha_obsoleto):
         return "FALSO"
 
-    dias_obsolescencia = (fecha_obsoleto - fecha_entrada).days
+    dias_obsolescencia = (fecha_entrada - fecha_obsoleto).days
 
     if dias_obsolescencia <= 90:
-        return "1.MENOR DE 90 DÍAS"
+        return "1.MENOR DE 90 DIAS"
     elif 90 < dias_obsolescencia <= 180:
-        return "2.ENTRE 90 Y 180 DÍAS"
+        return "2.ENTRE 90 Y 180 DIAS"
     elif 180 < dias_obsolescencia <= 270:
-        return "3.ENTRE 180 Y 270 DÍAS"
+        return "3.ENTRE 180 Y 270 DIAS"
     elif 270 < dias_obsolescencia <= 360:
-        return "4.ENTRE 270 Y 360 DÍAS"
+        return "4.ENTRE 270 Y 360 DIAS"
     elif 360 < dias_obsolescencia <= 540:
-        return "5.ENTRE 360 Y 540 DÍAS"
+        return "5.ENTRE 360 Y 540 DIAS"
     elif 540 < dias_obsolescencia <= 720:
-        return "6.ENTRE 540 Y 720 DÍAS"
+        return "6.ENTRE 540 Y 720 DIAS"
     else:
-        return "7.MAYOR DE 720 DÍAS"
+        return "7.MAYOR A 720 DIAS"
 
 
 def calculate_rango_vencido(row: pd.Series) -> str:
@@ -329,22 +329,22 @@ def calculate_rango_vencido(row: pd.Series) -> str:
     if status_cons != "VENCIDO" or pd.isna(fecha_entrada) or pd.isna(fecha_caducidad):
         return "FALSO"
 
-    dias_vencido = (fecha_caducidad - fecha_entrada).days
+    dias_vencido = (fecha_entrada - fecha_caducidad).days
 
     if dias_vencido <= 90:
-        return "1.MENOR DE 90 DÍAS"
+        return "1.MENOR DE 90 DIAS"
     elif 90 < dias_vencido <= 180:
-        return "2.ENTRE 90 Y 180 DÍAS"
+        return "2.ENTRE 90 Y 180 DIAS"
     elif 180 < dias_vencido <= 270:
-        return "3.ENTRE 180 Y 270 DÍAS"
+        return "3.ENTRE 180 Y 270 DIAS"
     elif 270 < dias_vencido <= 360:
-        return "4.ENTRE 270 Y 360 DÍAS"
+        return "4.ENTRE 270 Y 360 DIAS"
     elif 360 < dias_vencido <= 540:
-        return "5.ENTRE 360 Y 540 DÍAS"
+        return "5.ENTRE 360 Y 540 DIAS"
     elif 540 < dias_vencido <= 720:
-        return "6.ENTRE 540 Y 720 DÍAS"
+        return "6.ENTRE 540 Y 720 DIAS"
     else:
-        return "7.MAYOR DE 720 DÍAS"
+        return "7.MAYOR A 720 DIAS"
 
 
 def calculate_rango_bloqueado(row: pd.Series) -> str:
@@ -364,22 +364,22 @@ def calculate_rango_bloqueado(row: pd.Series) -> str:
     if status_cons != "BLOQUEADO" or pd.isna(fecha_entrada) or pd.isna(fecha_bloqueado):
         return "FALSO"
 
-    dias_vencido = (fecha_bloqueado - fecha_entrada).days
+    dias_vencido = (fecha_entrada - fecha_bloqueado).days
 
     if dias_vencido <= 90:
-        return "1.MENOR DE 90 DÍAS"
+        return "1.MENOR DE 90 DIAS"
     elif 90 < dias_vencido <= 180:
-        return "2.ENTRE 90 Y 180 DÍAS"
+        return "2.ENTRE 90 Y 180 DIAS"
     elif 180 < dias_vencido <= 270:
-        return "3.ENTRE 180 Y 270 DÍAS"
+        return "3.ENTRE 180 Y 270 DIAS"
     elif 270 < dias_vencido <= 360:
-        return "4.ENTRE 270 Y 360 DÍAS"
+        return "4.ENTRE 270 Y 360 DIAS"
     elif 360 < dias_vencido <= 540:
-        return "5.ENTRE 360 Y 540 DÍAS"
+        return "5.ENTRE 360 Y 540 DIAS"
     elif 540 < dias_vencido <= 720:
-        return "6.ENTRE 540 Y 720 DÍAS"
+        return "6.ENTRE 540 Y 720 DIAS"
     else:
-        return "7.MAYOR DE 720 DÍAS"
+        return "7.MAYOR A 720 DIAS"
 
 
 def calculate_rango_cons(row: pd.Series) -> str:
@@ -406,7 +406,7 @@ def calculate_rango_cons(row: pd.Series) -> str:
         return row.get("RANGO DE PERMANENCIA 2")
 
 
-def process_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def process_dataframe(df_final_combined: pd.DataFrame) -> pd.DataFrame:
     """
     Procesa el DataFrame aplicando todas las reglas de negocio en el orden específico requerido.
 
@@ -417,34 +417,42 @@ def process_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: DataFrame procesado con todas las columnas calculadas
     """
     # 1. Añadir columnas formuladas de 'MARCA CONCAT' y 'SEGMENTACION'
-    df["MARCA CONCAT"] = df["MARCA DE QM"].apply(lambda x: insert_marks().get(x, ""))
-    df["SEGMENTACION"] = df["MARCA DE QM"].apply(
+    df_final_combined["MARCA CONCAT"] = df_final_combined["MARCA DE QM"].apply(
+        lambda x: insert_marks().get(x, "")
+    )
+    df_final_combined["SEGMENTACION"] = df_final_combined["MARCA DE QM"].apply(
         lambda x: insert_segments().get(x, "OTRAS")
     )
 
     # 2. Calcular 'RANGO DE PERMANENCIA 2'
     required_columns = {"LOTE", "PERMANENCIA", "RANGO DE PERMANENCIA"}
-    if required_columns.issubset(df.columns):
-        df["RANGO DE PERMANENCIA 2"] = df.apply(calculate_rango_permanencia, axis=1)
+    if required_columns.issubset(df_final_combined.columns):
+        df_final_combined["RANGO DE PERMANENCIA 2"] = df_final_combined.apply(
+            calculate_rango_permanencia, axis=1
+        )
     else:
-        print(f"Faltan columnas: {required_columns - set(df.columns)}")
+        print(f"Faltan columnas: {required_columns - set(df_final_combined.columns)}")
 
     # 3. Calcular 'STATUS CONS'
     required_columns = {"RANGO PRÓX.VENCER MM", "VALOR BLOQUEADO MM", "VALOR OBSOLETO"}
-    if required_columns.issubset(df.columns):
-        df["STATUS CONS"] = df.apply(calculate_status_cons, axis=1)
+    if required_columns.issubset(df_final_combined.columns):
+        df_final_combined["STATUS CONS"] = df_final_combined.apply(
+            calculate_status_cons, axis=1
+        )
     else:
-        print(f"Faltan columnas: {required_columns - set(df.columns)}")
+        print(f"Faltan columnas: {required_columns - set(df_final_combined.columns)}")
 
     # 4. Calcular 'VALOR DEF'
     required_columns = {"STATUS CONS", "VALOR BLOQUEADO MM", "VALOR TOTAL MM"}
-    if required_columns.issubset(df.columns):
-        df["VALOR DEF"] = df.apply(calculate_valor_def, axis=1)
+    if required_columns.issubset(df_final_combined.columns):
+        df_final_combined["VALOR DEF"] = df_final_combined.apply(
+            calculate_valor_def, axis=1
+        )
     else:
-        print(f"Faltan columnas: {required_columns - set(df.columns)}")
+        print(f"Faltan columnas: {required_columns - set(df_final_combined.columns)}")
 
     # 5. Reemplazar valores inválidos
-    df.replace("#", np.nan, inplace=True)
+    df_final_combined.replace("#", np.nan, inplace=True)
 
     # 6. Convertir columnas de fecha
     date_columns = [
@@ -457,19 +465,29 @@ def process_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     ]
 
     for col in date_columns:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], format="%d/%m/%Y", errors="coerce")
+        if col in df_final_combined.columns:
+            df_final_combined[col] = pd.to_datetime(
+                df_final_combined[col], format="%d/%m/%Y", errors="coerce"
+            )
 
     # 7. Calcular 'RANGO OBSOLESCENCIA'
-    df["RANGO OBSOLESCENCIA"] = df.apply(calculate_rango_obsolescencia, axis=1)
+    df_final_combined["RANGO OBSOLESCENCIA"] = df_final_combined.apply(
+        calculate_rango_obsolescencia, axis=1
+    )
 
     # 8. Calcular 'RANGO VENCIDO 2'
-    df["RANGO VENCIDO 2"] = df.apply(calculate_rango_vencido, axis=1)
+    df_final_combined["RANGO VENCIDO 2"] = df_final_combined.apply(
+        calculate_rango_vencido, axis=1
+    )
 
     # 9. Calcular 'RANGO BLOQUEADO 2'
-    df["RANGO BLOQUEADO 2"] = df.apply(calculate_rango_bloqueado, axis=1)
+    df_final_combined["RANGO BLOQUEADO 2"] = df_final_combined.apply(
+        calculate_rango_bloqueado, axis=1
+    )
 
     # 10. Calcular 'RANGO CONS'
-    df["RANGO CONS"] = df.apply(calculate_rango_cons, axis=1)
+    df_final_combined["RANGO CONS"] = df_final_combined.apply(
+        calculate_rango_cons, axis=1
+    )
 
-    return df
+    return df_final_combined

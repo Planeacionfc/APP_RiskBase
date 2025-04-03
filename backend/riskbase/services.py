@@ -376,7 +376,7 @@ class SAPConnection:
         return df_combined
 
 
-# ----------- FUNCION PARA CONVERTIR LA VISTA EN UN DATAFRAME  --------- #
+# ----------- FUNCION PARA EXTRAER Y CONVERTIR LA VISTA EN UN DATAFRAME  --------- #
 
 
 def get_sap_risk_data(month: str = datetime.now().strftime("%m.%Y")) -> pd.DataFrame:
@@ -397,8 +397,8 @@ def get_sap_risk_data(month: str = datetime.now().strftime("%m.%Y")) -> pd.DataF
         ashost=os.getenv("ASHOST"),
         sysnr=os.getenv("SYSNR"),
         client=os.getenv("CLIENT"),
-        user=os.getenv("USER_AREIZA"),
-        passwd=os.getenv("PASSWORD_AREIZA"),
+        user=os.getenv("USER_SAP"),
+        passwd=os.getenv("PASSWORD_SAP"),
         lang="ES",
     )
 
@@ -538,8 +538,6 @@ def clean_risk_data(df_combined: pd.DataFrame) -> pd.DataFrame:
             ).dt.strftime("%d/%m/%Y")
 
     return df_combined
-
-    # ----------- FUNCION PARA EXPORTAR EL DATAFRAME A EXCEL  --------- #
 
 
 # ----------- FUNCION PARA EXPORTAR EL DATAFRAME A EXCEL  --------- #
