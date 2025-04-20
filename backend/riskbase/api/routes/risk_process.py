@@ -44,7 +44,8 @@ async def execute_risk_process(
             
         # 3. Procesar los datos aplicando todas las reglas de negocio
         df_final_combined = process_dataframe_columns(df_sap, matrices)
-        
+
+
         # 4. Guardar el DataFrame procesado para su uso posterior
         temp_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pkl"
         temp_dir = os.environ.get("TEMP_DIR", ".")

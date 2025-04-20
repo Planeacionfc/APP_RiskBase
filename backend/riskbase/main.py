@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import JSONResponse
 from .api.routes import router as api_router
 import os
 from dotenv import load_dotenv
@@ -15,14 +16,27 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Configurar CORS para permitir solicitudes desde el frontend
+# Configuración CORS
+origins = [
+    "*"
+    # Puedes restringir a tu dominio frontend, ej: "http://localhost:3000"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En producción, especificar los orígenes permitidos
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Manejo global de errores
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Error interno del servidor: {str(exc)}"}
+    )
 
 # Incluir las rutas de la API
 app.include_router(api_router)

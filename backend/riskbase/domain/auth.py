@@ -1,38 +1,63 @@
-from datetime import datetime, timedelta
-from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from .models.user import User, UserInDB, TokenData
+from .models.user import User, UserInDB, TokenData, UserRole
 import os
 from dotenv import load_dotenv
+from sqlalchemy import Column, Integer, String, Boolean, Enum as SqlEnum, create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+import enum
 
 load_dotenv()
 
 # Configuración de seguridad
+db_url = (
+    f"mssql+pyodbc://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_SERVER')}/{os.getenv('DATABASE')}"
+    "?driver=ODBC+Driver+17+for+SQL+Server"
+)
+engine = create_engine(db_url)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Base de datos simulada de usuarios
-fake_users_db = {
-    "admin": {
-        "username": "admin",
-        "email": "admin@prebel.com",
-        "hashed_password": pwd_context.hash("admin123"),
-        "role": "admin",
-        "is_active": True,
-    },
-    "user": {
-        "username": "user",
-        "email": "user@prebel.com",
-        "hashed_password": pwd_context.hash("user123"),
-        "role": "user",
-        "is_active": True,
-    },
-}
+# Entidad User para la base de datos
+class UserDB(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, index=True, nullable=False)
+    email = Column(String(100), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    role = Column(SqlEnum(UserRole), default=UserRole.ADMIN, nullable=False)
+    is_active = Column(Boolean, default=True)
 
+# Crear tabla y usuario admin predeterminado al iniciar
+
+def init_admin_user():
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    admin_user = db.query(UserDB).filter(UserDB.username == "admin").first()
+    if admin_user:
+        print("El usuario admin ya existe.")
+    else:
+        hashed_password = pwd_context.hash("admin123")
+        new_admin = UserDB(
+            username="admin",
+            email="admin@prebel.com",
+            hashed_password=hashed_password,
+            role=UserRole.ADMIN,
+            is_active=True
+        )
+        db.add(new_admin)
+        db.commit()
+        print("Usuario admin creado correctamente.")
+    db.close()
+
+# Ejecutar al importar este módulo
+init_admin_user()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -43,9 +68,10 @@ def get_password_hash(password: str) -> str:
 
 
 def get_user(username: str) -> Optional[UserInDB]:
-    if username in fake_users_db:
-        user_dict = fake_users_db[username]
-        return UserInDB(**user_dict)
+    db = SessionLocal()
+    user = db.query(UserDB).filter(UserDB.username == username).first()
+    if user:
+        return UserInDB(**user.__dict__)
     return None
 
 

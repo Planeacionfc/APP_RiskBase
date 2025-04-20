@@ -3,6 +3,7 @@ import os
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 from typing import Dict, Any
+from datetime import datetime
 
 load_dotenv()
 
@@ -138,19 +139,21 @@ def upload_dataframe_to_db(df_final_combined: pd.DataFrame) -> None:
     finally:
         engine.dispose()
 
-def export_dataframe_to_excel(df: pd.DataFrame, filename: str = None) -> str:
+def export_dataframe_to_excel(df: pd.DataFrame, filename: str = None, output_dir: str = None) -> str:
     """
-    Exporta un DataFrame a un archivo Excel con la fecha actual y lo guarda en una ruta específica.
+    Exporta un DataFrame a un archivo Excel en la ruta especificada o en el directorio de trabajo actual.
 
     Args:
         df: DataFrame a exportar
         filename: Nombre base del archivo (opcional)
+        output_dir: Ruta de destino (opcional)
 
     Returns:
         str: Ruta del archivo Excel creado
     """
-    # Definir la ruta de destino
-    output_dir = r"C:\Users\prac.planeacionfi\OneDrive - Prebel S.A BIC\Escritorio\PRUEBAS BASE RIESGO"
+    # Usar directorio de trabajo actual si no se especifica output_dir
+    if output_dir is None:
+        output_dir = os.getcwd()
 
     # Crear el nombre del archivo con la fecha actual
     current_date = datetime.now().strftime("%d-%m-%Y")
@@ -169,5 +172,5 @@ def export_dataframe_to_excel(df: pd.DataFrame, filename: str = None) -> str:
         print(f"Archivo Excel creado exitosamente: {file_path}")
         return file_path
     except Exception as e:
-        print(f"Error al exportar a Excel: {str(e)}")
-        return None
+        print(f"Error al exportar a Excel: {e}")
+        raise
