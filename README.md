@@ -30,27 +30,92 @@ Desarrollar un aplicativo web sostenible y escalable que permita la gestión efi
 - La interfaz debe ser intuitiva y permitir la interacción fluida con los datos.
 
 ## 🔧 Especificaciones del Entorno de Desarrollo
-- **Backend:** Python
+- **Backend:** Python, Django, Django Rest Framework
 - **Base de Datos:** SQL Server
-- **Frontend:** React
+- **Frontend:** React, Node.js
 
 ## 🚀 Instalación y Configuración
-1. Clonar el repositorio.
-2. Configurar las variables de entorno.
-3. Instalar las dependencias necesarias.
-4. Ejecutar el backend y frontend.
+
+Sigue estos pasos para instalar y configurar el proyecto **APP_RiskBase** (solo backend):
+
+### 1. Clonar el repositorio
+
+```bash
+# Clona el repositorio oficial
+git clone https://github.com/Planeacionfc/APP_RiskBase.git
+cd APP_RiskBase/backend
+```
+
+### 2. Crear y activar un entorno virtual (recomendado)
+
+```bash
+# En Windows
+python -m venv venv
+venv\Scripts\activate
+
+# En Linux/MacOS
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. Instalar dependencias
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configurar variables de entorno
+
+Copia el archivo de ejemplo `.env.example` a `.env` y edítalo con tus valores reales:
+
+```bash
+cp .env.example .env
+# Edita .env con tus credenciales de base de datos, SAP, API, etc.
+```
+
+> **Importante:** Nunca subas tu archivo `.env` a repositorios públicos.
+
+### 5. Iniciar el backend
+
+```bash
+# Desde la carpeta backend
+python run.py
+```
+
+El backend estará disponible en la URL y puerto configurados en tu archivo `.env` (por defecto http://127.0.0.1:8000).
+
+### 6. Acceder a la documentación interactiva
+
+Abre tu navegador en:
+
+- [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+Aquí puedes probar los endpoints y ver la documentación generada automáticamente.
 
 ## 📂 Código Fuente en GitHub
 - Repositorio Backend: [Enlace]
 - Repositorio Frontend: [Enlace]
 
 ## 🛠️ Plan de Soporte
-- Revisiones periódicas para garantizar la estabilidad del sistema.
-- Mantenimiento continuo para corrección de errores y mejoras.
+- Revisiones periódicas para garantizar la estabilidad del sistema backend.
+- Mantenimiento preventivo y correctivo del código y dependencias.
+- Actualización de librerías y parches de seguridad.
+- Soporte técnico a usuarios y desarrolladores mediante canales definidos (correo, tickets, etc).
+- Documentación actualizada para facilitar la transferencia de conocimiento y onboarding de nuevos desarrolladores.
 
 ## 📊 Monitorización y Logs
-- Registro de actividad y errores.
-- Uso de herramientas de monitoreo para supervisión del sistema.
+- El backend implementa manejo global de errores y respuestas estructuradas para una mejor trazabilidad.
+- Se recomienda activar y centralizar logs usando herramientas como [Uvicorn logging], [Loguru], o integración con sistemas de monitoreo como ELK Stack (Elasticsearch, Logstash, Kibana) o Grafana Loki.
+- Monitoreo de la salud del backend mediante endpoints de status y alertas automáticas ante caídas o errores críticos.
+- Revisión periódica de los archivos de log y métricas de uso para detectar patrones anómalos o cuellos de botella.
+
+## 🔄 Estrategias de Mantenimiento y Actualizaciones
+- Realizar backups regulares de la base de datos y de los archivos de configuración.
+- Probar las actualizaciones en un entorno de staging antes de desplegarlas en producción.
+- Automatizar los despliegues y actualizaciones usando herramientas como Docker, CI/CD (GitHub Actions, GitLab CI, etc).
+- Mantener actualizado el archivo `.env` y nunca exponerlo en repositorios públicos.
+- Documentar cada cambio relevante en el backend en el historial de versiones (changelog).
+- Revisar y actualizar las políticas de CORS y seguridad conforme evolucionen los requisitos del frontend.
 
 ## 🔒 Plan de Seguridad Técnica
 - Implementación de autenticación y control de accesos.
@@ -62,11 +127,7 @@ Desarrollar un aplicativo web sostenible y escalable que permita la gestión efi
 
 ## 👥 Descripción de Usuarios y Roles
 - **Administrador:** Acceso total al sistema.
-- **Usuario Operativo:** Consulta y modificación de datos según permisos asignados.
-
-## 🔄 Estrategia de Mantenimiento y Actualizaciones
-- Actualización periódica de dependencias y revisión de seguridad.
-- Implementación de nuevas funcionalidades según necesidades del negocio.
+- **Usuario Operativo:** Consulta de datos.
 
 ## 📦 Plan de Despliegue e Instalación
 - Despliegue en entornos de prueba y producción.

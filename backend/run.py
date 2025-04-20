@@ -22,7 +22,7 @@ if __name__ == "__main__":
     port = int(os.getenv("API_PORT"))
     
     # Configurar el directorio temporal para archivos
-    temp_dir = os.getenv("TEMP_DIR", "./temp")
+    temp_dir = os.getenv("TEMP_DIR")
     os.makedirs(temp_dir, exist_ok=True)
     
     print(f"Iniciando servidor en http://{host}:{port}")
