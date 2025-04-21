@@ -48,7 +48,7 @@ async def execute_risk_process(
 
         # 4. Guardar el DataFrame procesado para su uso posterior
         temp_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pkl"
-        temp_dir = os.environ.get("TEMP_DIR", ".")
+        temp_dir = os.environ.get("TEMP_DIR")
         os.makedirs(temp_dir, exist_ok=True)
         file_path = os.path.join(temp_dir, temp_file)
         df_final_combined.to_pickle(file_path)
@@ -75,7 +75,7 @@ async def execute_risk_process(
         )
 
 # Endpoint para visualizar el dataframe (usuarios regulares y administradores)
-@router.get("/data")
+@router.get("/data-view")
 async def get_risk_data(
     temp_file: Optional[str] = None,
     limit: int = 100,
@@ -155,7 +155,7 @@ async def export_to_excel(
     try:
         if temp_file:
             # Cargar desde archivo temporal
-            temp_dir = os.environ.get("TEMP_DIR", ".")
+            temp_dir = os.environ.get("TEMP_DIR")
             file_path = os.path.join(temp_dir, temp_file)
             if not os.path.exists(file_path):
                 raise HTTPException(
@@ -178,7 +178,14 @@ async def export_to_excel(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error al generar el archivo Excel"
             )
-            
+        
+        # Eliminar el archivo temporal después de exportar
+        try:
+            os.remove(file_path)
+        except Exception as del_err:
+            # Loguear o ignorar el error de borrado, pero no interrumpir la respuesta principal
+            pass
+        
         return FileResponse(
             path=excel_path,
             filename=os.path.basename(excel_path),
@@ -191,7 +198,10 @@ async def export_to_excel(
             detail=f"Error al exportar a Excel: {str(e)}"
         )
 
-# Endpoint para guardar en la base de datos (usuarios regulares y administradores)
+
+# --- ENDPOINTS SOLO PARA ADMINISTRADORES --- 
+
+# Endpoint para guardar en la base de datos
 @router.post("/save-to-db")
 async def save_to_database(
     temp_file: str,
@@ -208,7 +218,7 @@ async def save_to_database(
     """
     try:
         # Cargar desde archivo temporal
-        temp_dir = os.environ.get("TEMP_DIR", ".")
+        temp_dir = os.environ.get("TEMP_DIR")
         file_path = os.path.join(temp_dir, temp_file)
         if not os.path.exists(file_path):
             raise HTTPException(
@@ -231,11 +241,9 @@ async def save_to_database(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al guardar en la base de datos: {str(e)}"
         )
-
-# --- ENDPOINTS SOLO PARA ADMINISTRADORES ---
-
+    
 # Endpoint para obtener todas las matrices de la base de datos (solo administradores)
-@router.get("/matrices", response_model=Dict[str, Any])
+@router.get("/matrices-view", response_model=Dict[str, Any])
 async def get_matrices(
     current_user: User = Depends(get_current_admin_user)
 ):
@@ -272,7 +280,7 @@ async def get_matrices(
         )
 
 # Endpoint para modificar campos de las matrices (solo administradores)
-@router.put("/matrices", response_model=Dict[str, Any])
+@router.put("/matrices-save", response_model=Dict[str, Any])
 async def update_matrices(
     data: Dict[str, Any],
     current_user: User = Depends(get_current_admin_user)

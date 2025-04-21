@@ -1,7 +1,7 @@
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from ..dependencies import get_current_user
+from ..dependencies import get_current_user, get_current_admin_user
 from ...domain.models.user import User, Token, UserCreate
 from ...domain.auth import (
     authenticate_user,
@@ -19,7 +19,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 @router.post("/register", response_model=User, status_code=201)
-async def register_user(user: UserCreate = Body(...)):
+async def register_user(user: UserCreate = Body(...), current_user: User = Depends(get_current_admin_user)):
     db = SessionLocal()
     existing_user = db.query(UserDB).filter((UserDB.username == user.username) | (UserDB.email == user.email)).first()
     if existing_user:

@@ -5,7 +5,9 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import Column, Integer, String, Boolean, Enum as SqlEnum, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-import enum
+from typing import Optional
+from datetime import datetime, timedelta
+
 
 load_dotenv()
 
@@ -36,28 +38,28 @@ class UserDB(Base):
 
 # Crear tabla y usuario admin predeterminado al iniciar
 
-def init_admin_user():
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    admin_user = db.query(UserDB).filter(UserDB.username == "admin").first()
-    if admin_user:
-        print("El usuario admin ya existe.")
-    else:
-        hashed_password = pwd_context.hash("admin123")
-        new_admin = UserDB(
-            username="admin",
-            email="admin@prebel.com",
-            hashed_password=hashed_password,
-            role=UserRole.ADMIN,
-            is_active=True
-        )
-        db.add(new_admin)
-        db.commit()
-        print("Usuario admin creado correctamente.")
-    db.close()
+# def init_admin_user():
+#     Base.metadata.create_all(bind=engine)
+#     db = SessionLocal()
+#     admin_user = db.query(UserDB).filter(UserDB.username == "admin").first()
+#     if admin_user:
+#         print("El usuario admin ya existe.")
+#     else:
+#         hashed_password = pwd_context.hash("admin123")
+#         new_admin = UserDB(
+#             username="admin",
+#             email="admin@prebel.com",
+#             hashed_password=hashed_password,
+#             role=UserRole.ADMIN,
+#             is_active=True
+#         )
+#         db.add(new_admin)
+#         db.commit()
+#         print("Usuario admin creado correctamente.")
+#     db.close()
 
-# Ejecutar al importar este módulo
-init_admin_user()
+# # Ejecutar al importar este módulo
+# init_admin_user()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
