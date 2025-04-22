@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Header } from "../../components/header/header";
+import { ConditionalHeader } from "../../components/header/ConditionalHeader";
 import { ThemeProvider } from "next-themes";
 
 const FFFAcid = localFont({
@@ -11,8 +11,8 @@ const FFFAcid = localFont({
 const acidGroteskLight = localFont({ src: "./fonts/acid-grotesk-light.woff" });
 
 export const metadata: Metadata = {
-  title: "APP RiskBase",
-  description: "APP RiskBase",
+  title: "PF Manager",
+  description: "Aplicativo de Planeación Financiera para gestionar proyectos",
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
         className={`${acidGroteskLight.className} ${FFFAcid.className}  antialiased  text-[#202020] dark:text-bone bg-radial from-bone via-bone to-white dark:from-skyBlue dark:via-none dark:to-[#202020] `}
       >
         <ThemeProvider attribute="class" enableSystem defaultTheme="system">
-          <Header />
+          <ConditionalHeader />
           {children}
         </ThemeProvider>
       </body>

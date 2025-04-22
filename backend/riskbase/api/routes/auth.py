@@ -55,6 +55,10 @@ async def login_user(email: str = Body(...), password: str = Body(...)):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={
+            "sub": user.username,
+            "role": user.role
+        },
+        expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "Bearer"}

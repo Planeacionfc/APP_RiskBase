@@ -96,7 +96,7 @@ async def get_risk_data(
     try:
         if temp_file:
             # Cargar desde archivo temporal
-            temp_dir = os.environ.get("TEMP_DIR", ".")
+            temp_dir = os.environ.get("TEMP_DIR")
             file_path = os.path.join(temp_dir, temp_file)
             if not os.path.exists(file_path):
                 raise HTTPException(
