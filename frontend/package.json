@@ -15,7 +15,8 @@
     "postcss": "8.5.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "sweetalert2": "^11.19.1"
+    "sweetalert2": "^11.19.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "3",

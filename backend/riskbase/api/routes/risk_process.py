@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, File, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
 from ...domain.models.user import User
 from ..dependencies import get_current_active_user, get_current_admin_user
@@ -7,15 +9,16 @@ from ...services import (
     get_data_sap,
     df_matrices_merge,
     process_dataframe_columns,
-    export_dataframe_to_excel,
     upload_dataframe_to_db
 )
 import pandas as pd
+import numpy as np
 from sqlalchemy import create_engine
 import os
 from datetime import datetime
 import io
 import json
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
@@ -46,12 +49,12 @@ async def execute_risk_process(
         df_final_combined = process_dataframe_columns(df_sap, matrices)
 
 
-        # 4. Guardar el DataFrame procesado para su uso posterior
-        temp_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pkl"
+        # 4. Guardar el DataFrame procesado como archivo Excel para su uso posterior
+        excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
         temp_dir = os.environ.get("TEMP_DIR")
         os.makedirs(temp_dir, exist_ok=True)
-        file_path = os.path.join(temp_dir, temp_file)
-        df_final_combined.to_pickle(file_path)
+        excel_path = os.path.join(temp_dir, excel_file)
+        df_final_combined.to_excel(excel_path, index=False)
         
         # 5. Devolver estadísticas básicas
         result = {
@@ -59,7 +62,7 @@ async def execute_risk_process(
             "message": "Proceso ejecutado correctamente",
             "rows_processed": len(df_final_combined),
             "columns": df_final_combined.columns.tolist(),
-            "temp_file": temp_file,
+            "excel_file": excel_file,
             "summary": {
                 "total_records": len(df_final_combined),
                 # Agregar más estadísticas relevantes según necesidad
@@ -78,120 +81,79 @@ async def execute_risk_process(
 @router.get("/data-view")
 async def get_risk_data(
     temp_file: Optional[str] = None,
-    limit: int = 100,
+    limit: int = 25,
     offset: int = 0,
-    current_user: User = Depends(get_current_active_user)
+    current_user = Depends(get_current_active_user)
 ):
-    """
-    Obtiene los datos procesados para visualización.
-    
-    Args:
-        temp_file: Archivo temporal generado por el proceso
-        limit: Número máximo de registros a devolver
-        offset: Número de registros a saltar
-        
-    Returns:
-        Dict: Datos paginados y metadatos
-    """
     try:
-        if temp_file:
-            # Cargar desde archivo temporal
-            temp_dir = os.environ.get("TEMP_DIR")
-            file_path = os.path.join(temp_dir, temp_file)
-            if not os.path.exists(file_path):
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Archivo temporal no encontrado. Ejecute el proceso primero."
-                )
-            df = pd.read_pickle(file_path)
-        else:
-            # Si no hay archivo temporal, intentar obtener los datos más recientes
-            # Esto podría ser de una tabla de la base de datos donde se guardan los resultados
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No hay datos disponibles. Ejecute el proceso primero."
-            )
-        
-        # Obtener el total de registros
-        total_records = len(df)
-        
-        # Aplicar paginación
-        df_paginated = df.iloc[offset:offset+limit]
-        
-        # Convertir a diccionario para la respuesta JSON
+        if not temp_file:
+            raise HTTPException(status_code=400, detail="No se proporcionó archivo temporal.")
+        temp_dir = os.getenv(
+            "TEMP_DIR",
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "..", "temp")
+        )
+        file_path = os.path.join(temp_dir, temp_file)
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Archivo temporal no encontrado.")
+        df = pd.read_excel(file_path)
+
+        # Limitar a primeras 25 columnas
+        df = df.iloc[:, :25] if df.shape[1] >= 25 else df
+
+        # Paginación y saneamiento: inf, -inf y nan → None
+        df_paginated = (
+            df
+            .iloc[offset : offset + limit]
+            .replace([np.inf, -np.inf, np.nan], None)
+        )
+
         records = df_paginated.to_dict(orient="records")
-        
-        return {
-            "data": records,
-            "total": total_records,
+        safe_records = jsonable_encoder(records)
+
+        return JSONResponse({
+            "data": safe_records,
+            "total": len(df),
             "limit": limit,
             "offset": offset,
             "columns": df.columns.tolist()
-        }
-        
+        })
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al obtener los datos: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error al obtener los datos: {e}")
 
 # Endpoint para exportar a Excel (usuarios regulares y administradores)
 @router.get("/export-excel")
 async def export_to_excel(
-    temp_file: Optional[str] = None,
     filename: Optional[str] = None,
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Exporta los datos procesados a un archivo Excel.
-    
+    Exporta los datos procesados a un archivo Excel (no elimina el archivo tras la descarga).
     Args:
-        temp_file: Archivo temporal generado por el proceso
-        filename: Nombre personalizado para el archivo Excel
-        
+        filename: Nombre del archivo Excel en la carpeta temp
     Returns:
         FileResponse: Archivo Excel para descargar
     """
     try:
-        if temp_file:
-            # Cargar desde archivo temporal
+        if filename:
             temp_dir = os.environ.get("TEMP_DIR")
-            file_path = os.path.join(temp_dir, temp_file)
+            file_path = os.path.join(temp_dir, filename)
             if not os.path.exists(file_path):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Archivo temporal no encontrado. Ejecute el proceso primero."
                 )
-            df = pd.read_pickle(file_path)
+            return FileResponse(
+                path=file_path,
+                filename=os.path.basename(file_path),
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
         else:
-            # Si no hay archivo temporal, intentar obtener los datos más recientes
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No hay datos disponibles. Ejecute el proceso primero."
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se proporcionó el nombre del archivo."
             )
-        
-        # Exportar a Excel
-        excel_path = export_dataframe_to_excel(df, filename)
-        
-        if not excel_path or not os.path.exists(excel_path):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Error al generar el archivo Excel"
-            )
-        
-        # Eliminar el archivo temporal después de exportar
-        try:
-            os.remove(file_path)
-        except Exception as del_err:
-            # Loguear o ignorar el error de borrado, pero no interrumpir la respuesta principal
-            pass
-        
-        return FileResponse(
-            path=excel_path,
-            filename=os.path.basename(excel_path),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -201,41 +163,39 @@ async def export_to_excel(
 
 # --- ENDPOINTS SOLO PARA ADMINISTRADORES --- 
 
+# Modelo para recibir el nombre del archivo desde el body JSON
+class FileNameRequest(BaseModel):
+    filename: str
+
 # Endpoint para guardar en la base de datos
 @router.post("/save-to-db")
 async def save_to_database(
-    temp_file: str,
+    request: FileNameRequest,
     current_user: User = Depends(get_current_admin_user)
 ):
     """
-    Guarda los datos procesados en la base de datos.
-    
+    Guarda los datos procesados en la base de datos (sube el archivo completo, sin filtros).
     Args:
-        temp_file: Archivo temporal generado por el proceso
-        
+        filename: Archivo temporal generado por el proceso
     Returns:
         Dict: Resultado de la operación
     """
     try:
-        # Cargar desde archivo temporal
         temp_dir = os.environ.get("TEMP_DIR")
-        file_path = os.path.join(temp_dir, temp_file)
+        filename = request.filename
+        file_path = os.path.join(temp_dir, filename)
         if not os.path.exists(file_path):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Archivo temporal no encontrado. Ejecute el proceso primero."
             )
-        df = pd.read_pickle(file_path)
-        
-        # Guardar en la base de datos
+        df = pd.read_excel(file_path)
         upload_dataframe_to_db(df)
-        
         return {
             "success": True,
             "message": "Datos guardados correctamente en la base de datos",
             "rows_saved": len(df)
         }
-        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -335,3 +295,29 @@ async def update_matrices(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al actualizar las matrices: {str(e)}"
         )
+
+# Endpoint para eliminar archivo temporal
+@router.delete("/delete-temp-file")
+async def delete_temp_file(
+    filename: str = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Elimina un archivo temporal Excel de la carpeta temp.
+    Args:
+        filename: Nombre del archivo Excel a eliminar
+    Returns:
+        Dict: Resultado de la operación
+    """
+    try:
+        if not filename:
+            raise HTTPException(status_code=400, detail="No se proporcionó el nombre del archivo.")
+        temp_dir = os.environ.get("TEMP_DIR")
+        file_path = os.path.join(temp_dir, filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            return {"success": True, "message": "Archivo eliminado."}
+        else:
+            return {"success": False, "message": "El archivo no existe."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al eliminar archivo: {str(e)}")
