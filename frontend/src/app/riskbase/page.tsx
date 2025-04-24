@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import Swal from "sweetalert2";
+import { showAlert } from "../../utils/swal";
 
 export default function RiskBasePage() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -9,6 +9,7 @@ export default function RiskBasePage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState("");
   const [excelFile, setExcelFile] = useState<string>("");
 
@@ -25,19 +26,30 @@ export default function RiskBasePage() {
     return localStorage.getItem("token");
   };
 
-  // Procesar: llama a /risk/process y luego obtiene los datos desde /risk/data-view
-  const handleProcess = async () => {
+  // Llama a /risk/process (con o sin mes/anio) y luego obtiene los datos desde /risk/data-view
+  const callProcess = async (mes?: number, anio?: number) => {
     setProcessing(true);
     setError("");
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/risk/process`, {
+      let url = `${API_URL}/risk/process`;
+      if (mes && anio) url += `?mes=${mes}&anio=${anio}`;
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         }
       });
+      if (response.status === 401) {
+        await showAlert({
+          icon: 'error',
+          title: 'No autorizado',
+          text: 'No estás autorizado o tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+        });
+        setProcessing(false);
+        return;
+      }
       if (!response.ok) throw new Error("Error al procesar datos");
       const result = await response.json();
       const excelFileName = result.excel_file;
@@ -50,7 +62,7 @@ export default function RiskBasePage() {
         }
       });
       if (dfRes.status === 401) {
-        Swal.fire({
+        await showAlert({
           icon: 'error',
           title: 'No autorizado',
           text: 'No estás autorizado o tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
@@ -68,10 +80,13 @@ export default function RiskBasePage() {
         });
         return rowObj;
       }));
-      Swal.fire({
+      await showAlert({
+        position: "center",
         icon: 'success',
         title: '¡Proceso finalizado!',
-        text: 'El proceso ha terminado exitosamente.'
+        text: 'El proceso ha terminado exitosamente.',
+        showConfirmButton: true,
+        confirmButtonText: 'OK'
       });
     } catch (err: any) {
       setError(err.message || "Error inesperado");
@@ -80,15 +95,45 @@ export default function RiskBasePage() {
     }
   };
 
+  // Procesar: llama a callProcess() sin parámetros
+  const handleProcess = async () => {
+    await callProcess();
+  };
+
+  // Consultar por mes y año
+  const handleConsult = async () => {
+    
+    const Swal = (await import('sweetalert2')).default;
+    const { value } = await Swal.fire({
+      title: "Consultar registros de Base de Riesgo",
+      icon: 'info',
+      html: `
+        <p>Por favor, ingresa el mes y año para consultar los registros.</p>
+        <input id="swal-mes"  class="swal2-input" placeholder="Mes"  type="number" min="1" max="12"/>
+        <input id="swal-anio" class="swal2-input" placeholder="Año" type="number"/>
+      `,
+      preConfirm: () => {
+        const mes  = Number((document.getElementById("swal-mes")  as HTMLInputElement).value);
+        const anio = Number((document.getElementById("swal-anio") as HTMLInputElement).value);
+        if(!mes||mes<1||mes>12||!anio) Swal.showValidationMessage("Mes 1-12 y año válido");
+        return {mes,anio};
+      },
+      showCancelButton: true, confirmButtonText:"Consultar"
+    });
+    if(value) await callProcess(value.mes, value.anio);
+  };
+
   // Guardar en BD con confirmación
   const handleSaveToDB = async () => {
-    const confirm = await Swal.fire({
+    const confirm = await showAlert({
+      position: "center",
       title: '¿Estás seguro?',
       text: '¿Deseas guardar los datos en la base de datos? Esta acción eliminará el archivo temporal.',
       icon: 'warning',
-      showCancelButton: true,
       confirmButtonText: 'Sí, guardar',
       cancelButtonText: 'Cancelar',
+      showConfirmButton: true,
+      showCancelButton: true,
       reverseButtons: true
     });
     if (!confirm.isConfirmed) return;
@@ -107,7 +152,7 @@ export default function RiskBasePage() {
         body: JSON.stringify({ filename: excelFile })
       });
       if (response.status === 401) {
-        Swal.fire({
+        await showAlert({
           icon: 'error',
           title: 'No autorizado',
           text: 'No estás autorizado o tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
@@ -123,10 +168,13 @@ export default function RiskBasePage() {
           "Authorization": `Bearer ${token}`
         }
       });
-      Swal.fire({
+      await showAlert({
+        position: "center",
         icon: 'success',
         title: '¡Proceso finalizado!',
-        text: 'Datos guardados exitosamente.'
+        text: 'Datos guardados exitosamente.',
+        showConfirmButton: true,
+        confirmButtonText: 'OK',
       });
     } catch (err: any) {
       setError(err.message || "Error inesperado");
@@ -149,7 +197,7 @@ export default function RiskBasePage() {
         }
       });
       if (response.status === 401) {
-        Swal.fire({
+        await showAlert({
           icon: 'error',
           title: 'No autorizado',
           text: 'No estás autorizado o tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
@@ -174,9 +222,22 @@ export default function RiskBasePage() {
 
   return (
     <div className="flex flex-col items-center min-h-screen bg-white dark:bg-[#232836] px-15 py-10">
-      <h1 className="text-3xl md:text-4xl font-bold mb-8 mt-2 text-center text-skyBlue dark:text-bone">Base de Riesgo</h1>
+      <h1 className="text-3xl md:text-4xl font-bold mb-8 mt-2 text-center text-skyBlue dark:text-bone">Procesamiento de Base de Riesgo</h1>
+      <p className="text-center text-gray-700 dark:text-gray-300 mb-8">
+        En esta sección se realizan los procesos de extracción, transformación y carga de datos de la base de riesgo.
+        El proceso completo implica extracción de datos de SAP, procesamiento de columnas y carga en la base de datos.
+        Luego, se puede exportar el resultado a un archivo Excel.
+        También es posible consultar información de la base de riesgo que ha sido almacenada en la base de datos de meses anteriores
+        y actualizar su política.
+        <span className="bg-yellow-100 text-yellow-800 p-2 rounded-lg block mt-4">
+          <strong>Nota:</strong> Primero debe descargar el archivo Excel y luego guardar la información en la base de datos.
+          Al subir la información a la BD se elimina el archivo temporal con la información y deberá realizar el proceso nuevamente.
+        </span>
+      </p>
+      
+
       <div className="w-full max-w-9xl flex flex-col items-center bg-white/80 dark:bg-[#2c3e64] rounded-xl shadow-black shadow-md p-12">
-        <div className="flex justify-center mb-6 w-full">
+        <div className="flex flex-col md:flex-row gap-6 w-full justify-center mt-2 mb-6">
           <button
             className="px-8 py-3 bg-skyBlue hover:bg-[#4278FA]/80 dark:bg-bone dark:hover:bg-bone/80 text-white dark:text-black font-semibold rounded-lg shadow transition-colors duration-200 text-xl flex items-center justify-center gap-2"
             onClick={handleProcess}
@@ -188,7 +249,20 @@ export default function RiskBasePage() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
               </svg>
             )}
-            {processing ? "Procesando..." : "Procesar"}
+            {processing ? "Procesando..." : "Procesar base riesgo"}
+          </button>
+          <button
+            className="px-8 py-3 bg-skyBlue hover:bg-[#4278FA]/80 dark:bg-bone dark:hover:bg-bone/80 text-white dark:text-black font-semibold rounded-lg shadow transition-colors duration-200 text-xl flex items-center justify-center gap-2"
+            onClick={handleConsult}
+            disabled={extracting}
+          >
+            {extracting && (
+              <svg className="animate-spin h-5 w-5 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+            )}
+            {extracting ? "Consultando..." : "Consultar base riesgo"}
           </button>
         </div>
         {/* Tabla dinámica renderizada */}
@@ -268,7 +342,7 @@ export default function RiskBasePage() {
           </button>
           <button
             className="px-8 py-3 bg-skyBlue hover:bg-[#4278FA]/80 dark:bg-bone dark:hover:bg-bone/80 text-white dark:text-black font-semibold rounded-lg shadow transition-colors duration-200 text-xl flex items-center justify-center gap-2"
-            onClick={handleSaveToDB}
+            onClick={() => window.location.href = "/matrices"}
             disabled={loading}
           >
             Actualizar política

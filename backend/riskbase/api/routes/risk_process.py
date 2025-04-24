@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, Response, File, UploadFile, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -9,7 +9,8 @@ from ...services import (
     get_data_sap,
     df_matrices_merge,
     process_dataframe_columns,
-    upload_dataframe_to_db
+    upload_dataframe_to_db,
+    get_inventory_by_month_year
 )
 import pandas as pd
 import numpy as np
@@ -19,35 +20,74 @@ from datetime import datetime
 import io
 import json
 from pydantic import BaseModel
+import traceback
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
 # Endpoint para ejecutar el proceso completo (usuarios regulares y administradores)
 @router.post("/process", response_model=Dict[str, Any])
 async def execute_risk_process(
+    mes: Optional[int] = Query(None, ge=1, le=12),
+    anio: Optional[int] = Query(None, ge=2000),
     current_user: User = Depends(get_current_active_user)
 ):
     """
     Ejecuta el proceso completo de extracción, transformación y carga de datos de riesgo.
-    
-    Returns:
-        Dict: Resumen del proceso con estadísticas básicas
+    Permite consultar por mes y año si se especifican como query params.
     """
     try:
+        print(f"[LOG] Params recibidos: mes={mes} anio={anio}")
         # 1. Obtener datos de las matrices de la base de datos
         matrices = df_matrices_merge()
-        
-        # 2. Extraer datos de SAP
-        df_sap = get_data_sap()
-        if df_sap is None or df_sap.empty:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No se pudieron obtener datos de SAP"
-            )
-            
-        # 3. Procesar los datos aplicando todas las reglas de negocio
-        df_final_combined = process_dataframe_columns(df_sap, matrices)
+        print(f"[LOG] Matrices shape: {matrices.shape if hasattr(matrices, 'shape') else type(matrices)}")
 
+        # 2. Extraer datos según parámetros
+        if mes is not None and anio is not None:
+            mes = int(mes)
+            anio = int(anio)
+            print(f"[LOG] Consultando get_inventory_by_month_year({mes}, {anio})")
+            df_sap = get_inventory_by_month_year(mes, anio)
+            print(f"[LOG] df_sap shape: {df_sap.shape if hasattr(df_sap, 'shape') else type(df_sap)}")
+            if df_sap is None or df_sap.empty:
+                print(f"[LOG] Sin datos para mes={mes}, anio={anio}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"No se encontraron datos para mes={mes} y año={anio}"
+                )
+            # --- DEVOLVER DATOS CRUDOS ---
+            excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+            temp_dir = os.environ.get("TEMP_DIR")
+            os.makedirs(temp_dir, exist_ok=True)
+            excel_path = os.path.join(temp_dir, excel_file)
+            df_sap.to_excel(excel_path, index=False)
+            print(f"[LOG] Excel guardado en: {excel_path}")
+            result = {
+                "success": True,
+                "message": "Consulta ejecutada correctamente (datos crudos)",
+                "rows_processed": len(df_sap),
+                "columns": df_sap.columns.tolist(),
+                "excel_file": excel_file,
+                "summary": {
+                    "total_records": len(df_sap),
+                }
+            }
+            print(f"[LOG] Consulta cruda finalizada OK")
+            return result
+        else:
+            print(f"[LOG] Consultando get_data_sap()")
+            df_sap = get_data_sap()
+            print(f"[LOG] df_sap shape: {df_sap.shape if hasattr(df_sap, 'shape') else type(df_sap)}")
+            if df_sap is None or df_sap.empty:
+                print(f"[LOG] Sin datos de SAP")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No se pudieron obtener datos de SAP"
+                )
+
+        # 3. Procesar los datos aplicando todas las reglas de negocio
+        print(f"[LOG] Procesando DataFrame con process_dataframe_columns...")
+        df_final_combined = process_dataframe_columns(df_sap, matrices)
+        print(f"[LOG] df_final_combined shape: {df_final_combined.shape if hasattr(df_final_combined, 'shape') else type(df_final_combined)}")
 
         # 4. Guardar el DataFrame procesado como archivo Excel para su uso posterior
         excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
@@ -55,7 +95,8 @@ async def execute_risk_process(
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
         df_final_combined.to_excel(excel_path, index=False)
-        
+        print(f"[LOG] Excel guardado en: {excel_path}")
+
         # 5. Devolver estadísticas básicas
         result = {
             "success": True,
@@ -68,20 +109,22 @@ async def execute_risk_process(
                 # Agregar más estadísticas relevantes según necesidad
             }
         }
-        
+        print(f"[LOG] Proceso finalizado OK")
         return result
-        
+
     except Exception as e:
+        tb = traceback.format_exc()
+        print(f"[ERROR] {str(e)}\n{tb}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al ejecutar el proceso: {str(e)}"
+            detail=f"Error al ejecutar el proceso: {str(e)}\n{tb}"
         )
 
 # Endpoint para visualizar el dataframe (usuarios regulares y administradores)
 @router.get("/data-view")
 async def get_risk_data(
     temp_file: Optional[str] = None,
-    limit: int = 25,
+    limit: int = 20,
     offset: int = 0,
     current_user = Depends(get_current_active_user)
 ):
@@ -97,8 +140,8 @@ async def get_risk_data(
             raise HTTPException(status_code=404, detail="Archivo temporal no encontrado.")
         df = pd.read_excel(file_path)
 
-        # Limitar a primeras 25 columnas
-        df = df.iloc[:, :25] if df.shape[1] >= 25 else df
+        # Mostar todas las columnas
+        df = df.iloc[:, :52] if df.shape[1] >= 52 else df
 
         # Paginación y saneamiento: inf, -inf y nan → None
         df_paginated = (
@@ -246,50 +289,63 @@ async def update_matrices(
     current_user: User = Depends(get_current_admin_user)
 ):
     """
-    Actualiza los campos de las matrices en la base de datos.
+    Actualiza los campos factor_prov y clasificacion en la tabla MatrizBaseRiesgo.
     Solo accesible para administradores.
-    
-    Args:
-        data: Datos actualizados de las matrices
-        
-    Returns:
-        Dict: Resultado de la actualización
     """
+    import sqlalchemy
+    from sqlalchemy import update as sqlalchemy_update
     try:
-        # Convertir los datos recibidos a un DataFrame
-        df_updated = pd.DataFrame(data.get("matrices", []))
-        
-        if df_updated.empty:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No se proporcionaron datos para actualizar"
-            )
-            
-        # Aquí implementar la lógica para actualizar la base de datos
-        # Por ejemplo, usando SQLAlchemy para hacer un update masivo
-        
-        # Ejemplo simplificado (en una implementación real, esto sería más complejo)
-        server = os.getenv("DB_SERVER")
-        database = os.getenv("DATABASE")
+        # Recibe una lista de cambios: cada item debe tener id_politica_base_riesgo, factor_prov, clasificacion
+        matrices = data.get("rows") or data.get("matrices") or []
+        if not matrices:
+            raise HTTPException(status_code=400, detail="No se enviaron filas para actualizar.")
         usuario = os.getenv("DB_USER")
-        password = os.getenv("DB_PASSWORD")
-        driver = "ODBC Driver 17 for SQL Server"
-        
+        pwd     = os.getenv("DB_PASSWORD")
+        server  = os.getenv("DB_SERVER")
+        db      = os.getenv("DATABASE")
+        driver  = "ODBC Driver 17 for SQL Server"
         engine = create_engine(
-            f"mssql+pyodbc://{usuario}:{password}@{server}/{database}?driver={driver}"
+            f"mssql+pyodbc://{usuario}:{pwd}@{server}/{db}?driver={driver}",
+            connect_args={"fast_executemany": True}
         )
-        
-        # Guardar los cambios en la base de datos
-        # Nota: Esto es un ejemplo simplificado, en una implementación real
-        # se debería manejar con más cuidado las actualizaciones
-        df_updated.to_sql("MatrizBaseRiesgo", con=engine, if_exists="replace", index=False)
-        
+        errors = []
+        updated = 0
+        with engine.begin() as conn:
+            for row in matrices:
+                id_ = row.get("id_politica_base_riesgo")
+                factor_prov = row.get("factor_prov")
+                clasificacion = row.get("clasificacion")
+                if id_ is None:
+                    errors.append({"id": None, "error": "Falta id_politica_base_riesgo"})
+                    continue
+                stmt = sqlalchemy_update(sqlalchemy.table("MatrizBaseRiesgo")).where(
+                    sqlalchemy.column("id_politica_base_riesgo") == id_
+                )
+                update_dict = {}
+                if factor_prov is not None:
+                    update_dict["factor_prov"] = factor_prov
+                if clasificacion is not None:
+                    update_dict["clasificacion"] = clasificacion
+                if not update_dict:
+                    errors.append({"id": id_, "error": "Nada para actualizar"})
+                    continue
+                try:
+                    result = conn.execute(
+                        stmt.values(**update_dict)
+                    )
+                    if result.rowcount == 0:
+                        errors.append({"id": id_, "error": "ID no encontrado"})
+                    else:
+                        updated += result.rowcount
+                except Exception as ex:
+                    errors.append({"id": id_, "error": str(ex)})
         return {
-            "success": True,
-            "message": "Matrices actualizadas correctamente",
-            "rows_updated": len(df_updated)
+            "success": len(errors) == 0,
+            "message": f"{updated} filas actualizadas. {len(errors)} errores.",
+            "rows_updated": updated,
+            "errorRows": [e["id"] for e in errors],
+            "errors": errors
         }
-        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -2,7 +2,7 @@ from pyrfc._cyrfc import Connection, ABAPApplicationError
 import pandas as pd
 import numpy as np
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 
@@ -236,11 +236,14 @@ class SAPConnection:
 
 def get_data_sap():
     """
-    Función que se encarga de conectarse a SAP y obtener los datos 
-    del informe de stock de inventario para el mes actual.
+    Conecta a SAP y obtiene el stock del mes ANTERIOR al mes actual.
     """
-
-    month = datetime.now().strftime("%m.%Y")
+    # 1) Calcular el último día del mes anterior:
+    today = datetime.now()
+    first_day_of_month = today.replace(day=1)
+    last_day_of_previous_month = first_day_of_month - timedelta(days=1)
+    # 2) Formatear como mm.YYYY
+    month = last_day_of_previous_month.strftime("%m.%Y")
 
     sap_conn = SAPConnection(
         ashost=os.getenv("ASHOST"),

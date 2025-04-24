@@ -174,3 +174,111 @@ def export_dataframe_to_excel(df: pd.DataFrame, filename: str = None, output_dir
     except Exception as e:
         print(f"Error al exportar a Excel: {e}")
         raise
+
+def get_inventory_by_month_year(mes: int, anio: int) -> pd.DataFrame:
+    """
+    Consulta InventarioBaseRiesgo filtrando mes y año de registro.
+    """
+    usuario = os.getenv("DB_USER")
+    pwd     = os.getenv("DB_PASSWORD")
+    server  = os.getenv("DB_SERVER")
+    db      = os.getenv("DATABASE")
+    driver  = "ODBC Driver 17 for SQL Server"
+
+    engine = create_engine(
+        f"mssql+pyodbc://{usuario}:{pwd}@{server}/{db}?driver={driver}",
+        connect_args={"fast_executemany": True}
+    )
+    sql = text("""
+        SELECT
+            mes_registro,
+            año_registro,
+            [NEGOCIO INVENTARIOS],
+            [AÑO NATURAL/MES],
+            [TIPO MATERIAL INVENTARIO],
+            [MARCA DE QM],
+            [MATERIAL],
+            [DESCRIPCIÓN],
+            [UNIDAD MEDIDA],
+            [CENTRO],
+            [CODIGO ALMACEN CLIENTE],
+            [INDICADOR STOCK ESPEC.],
+            [NÚM.STOCK.ESP.],
+            [LOTE],
+            [CREADO EL],
+            [FECH. FABRICACIÓN],
+            [FECH, CADUCIDAD/FECH PREF. CONSUMO],
+            [FECHA BLOQUEADO],
+            [FECHA OBSOLETO],
+            [FECHA ENTRADA],
+            [RANGO OBSOLETO 2],
+            [RANGO COBERTURA],
+            [RANGO DE PERMANENCIA],
+            [RANGO BLOQUEADO],
+            [RANGO OBSOLETO],
+            [RANGO VENCIDOS],
+            [PRÓXIMO A VENCER],
+            [RANGO PRÓX.VENCER MM],
+            [RANGO PRÓXIMOS A VEN],
+            [TIPO DE MATERIAL (I)],
+            [COSTO UNITARIO REAL],
+            [INVENTARIO DISPONIBL],
+            [INVENTARIO NO DISPON],
+            [VALOR OBSOLETO],
+            [VALOR BLOQUEADO MM],
+            [VALOR TOTAL MM],
+            [PERMANENCIA],
+            [MARCA CONCAT],
+            [SEGMENTACION],
+            [SUBSEGMENTACION],
+            [RANGO DE PERMANENCIA 2],
+            [STATUS CONS],
+            [VALOR DEF],
+            [RANGO OBSOLESCENCIA],
+            [RANGO VENCIDO 2],
+            [RANGO BLOQUEADO 2],
+            [RANGO CONS],
+            [TIEMPO BLOQUEO],
+            [FACTOR PROV],
+            [CLAS BASE RIESGO],
+            [BASE RIESGO],
+            [PROVISION]
+          FROM InventarioBaseRiesgo
+         WHERE mes_registro = :mes
+           AND año_registro = :anio
+    """)
+    with engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params={"mes": mes, "anio": anio})
+
+    # Convertir columnas numéricas
+    columnas_numericas = [
+        "COSTO UNITARIO REAL",
+        "INVENTARIO DISPONIBL",
+        "INVENTARIO NO DISPON",
+        "VALOR OBSOLETO",
+        "VALOR BLOQUEADO MM",
+        "VALOR TOTAL MM",
+        "PERMANENCIA",
+        "FACTOR PROV",
+        "VALOR DEF",
+        "BASE RIESGO",
+        "PROVISION"
+    ]
+    for col in columnas_numericas:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Convertir columnas de fechas
+    columnas_fecha = [
+        "FECHA ENTRADA",
+        "CREADO EL",
+        "FECHA BLOQUEADO",
+        "FECHA OBSOLETO",
+        "FECH. FABRICACIÓN",
+        "FECH, CADUCIDAD/FECH PREF. CONSUMO"
+    ]
+    for col in columnas_fecha:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+
+    return df

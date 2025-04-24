@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import Swal from 'sweetalert2';
+import { showAlert } from "../../utils/swal";;
 
 interface JwtPayload {
   role?: string;
@@ -35,7 +35,7 @@ export default function LoginPage() {
         const data = await response.json();
         setError(data.detail || 'Error al iniciar sesión');
         // Mostrar alerta SweetAlert de error
-        Swal.fire({
+        showAlert({
           icon: "error",
           title: "Oops...",
           text: "Usuario o contraseña incorrectos"
@@ -63,7 +63,7 @@ export default function LoginPage() {
         return;
       }
       // Mostrar animación SweetAlert antes de redirigir
-      Swal.fire({
+      showAlert({
         position: "center",
         icon: "success",
         title: "¡Bienvenido!",
@@ -76,7 +76,7 @@ export default function LoginPage() {
     } catch (err) {
       setError('Error de red o servidor');
       // Mostrar animación SweetAlert de error
-      Swal.fire({
+      showAlert({
         icon: "error",
         title: "Oops...",
         text: "Error de red o servidor"

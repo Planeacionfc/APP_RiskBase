@@ -27,7 +27,8 @@ from .database_operations import (
     get_matrices_base_riesgo,
     df_matrices_merge,
     upload_dataframe_to_db,
-    export_dataframe_to_excel
+    export_dataframe_to_excel,
+    get_inventory_by_month_year
 )
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     'df_matrices_merge',
     'upload_dataframe_to_db',
     'export_dataframe_to_excel',
+    'get_inventory_by_month_year',
     
     # Data Processing
     'insert_marks',
