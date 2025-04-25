@@ -1,9 +1,8 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2";
-import { DataGrid, type Column } from "react-data-grid";
-import "react-data-grid/lib/styles.css";
+import { DataGrid, GridColDef, GridRowsProp, GridToolbar } from '@mui/x-data-grid';
+import { Box } from '@mui/material';
 
 interface MatrizRow {
   id_politica_base_riesgo: number;
@@ -19,46 +18,59 @@ interface MatrizRow {
   negocio: string;
   [key: string]: any;
 }
+
+interface MatrizUpdatePayload {
+  id_politica_base_riesgo: number;
+  factor_prov: number;
+  clasificacion: string;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Recupera el token JWT almacenado en localStorage
-const getToken = () => {
-  return localStorage.getItem("token");
-};
+const getToken = () => localStorage.getItem("token");
 
+// Llama al endpoint para obtener las matrices
 const fetchMatrices = async (): Promise<{ matrices: MatrizRow[] }> => {
   const token = getToken();
   const res = await fetch(`${API_URL}/risk/matrices-view`, {
     credentials: "include",
-    headers: token ? { "Authorization": `Bearer ${token}` } : {},
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error("Error al obtener matrices");
   return res.json();
 };
 
-const updateMatrices = async (rows: MatrizRow[]) => {
+// Llama al endpoint para guardar los cambios
+const updateMatrices = async (payload: { rows: MatrizUpdatePayload[] }) => {
   const token = getToken();
   const res = await fetch(`${API_URL}/risk/matrices-save`, {
     method: "PUT",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { "Authorization": `Bearer ${token}` } : {})
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ rows }),
-    credentials: "include"
+    body: JSON.stringify(payload),
   });
   return res.json();
 };
 
 export default function MatricesPage() {
   const [rows, setRows] = useState<MatrizRow[]>([]);
+  const [originalRows, setOriginalRows] = useState<MatrizRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorRows, setErrorRows] = useState<number[]>([]);
+  const [selectionModel, setSelectionModel] = useState<(number | string)[]>([]);
 
+  // Al montar, traemos las matrices
   useEffect(() => {
     setLoading(true);
     fetchMatrices()
-      .then((data) => setRows(data.matrices || []))
+      .then((data) => {
+        setRows(data.matrices || []);
+        setOriginalRows(data.matrices || []);
+      })
       .catch(() =>
         Swal.fire({
           icon: "error",
@@ -69,30 +81,55 @@ export default function MatricesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const columns: Column<MatrizRow>[] = [
-    { key: "id_politica_base_riesgo", name: "ID Política", editable: true },
-    { key: "concatenado", name: "Concatenado", editable: true },
-    { key: "segmento", name: "Segmento", editable: true },
-    { key: "permanencia", name: "Permanencia", editable: true },
-    { key: "factor_prov", name: "Factor Prov", editable: true },
-    { key: "clasificacion", name: "Clasificación", editable: true },
-    { key: "tipo_matriz", name: "Tipo Matriz", editable: true },
-    { key: "subsegmento", name: "Subsegmento", editable: true },
-    { key: "estado", name: "Estado", editable: true },
-    { key: "cobertura", name: "Cobertura", editable: true },
-    { key: "negocio", name: "Negocio", editable: true },
-  ];
-
-  const onRowsChange = (newRows: MatrizRow[], { indexes }: { indexes: number[] }) => {
-    setRows(newRows);
-    setErrorRows((prev) => prev.filter((i) => !indexes.includes(i)));
+  // Para edición inline
+  const processRowUpdate = async (newRow: MatrizRow) => {
+    const updatedRows = rows.map((row) =>
+      row.id_politica_base_riesgo === newRow.id_politica_base_riesgo ? newRow : row
+    );
+    setRows(updatedRows);
+    // Puedes guardar automáticamente aquí o dejarlo para el botón "Guardar Cambios"
+    return newRow;
   };
 
+  // Columnas para MUI DataGrid
+  const columns: GridColDef[] = [
+    { field: "id_politica_base_riesgo", headerName: "ID Política", width: 120, editable: false },
+    { field: "concatenado", headerName: "Concatenado", width: 180, editable: false },
+    { field: "segmento", headerName: "Segmento", width: 140, editable: false },
+    { field: "permanencia", headerName: "Permanencia", width: 140, editable: false },
+    { field: "factor_prov", headerName: "Factor Prov", width: 120, editable: true, type: 'number' },
+    { field: "clasificacion", headerName: "Clasificación", width: 140, editable: true },
+    { field: "tipo_matriz", headerName: "Tipo Matriz", width: 140, editable: false },
+    { field: "subsegmento", headerName: "Subsegmento", width: 140, editable: false },
+    { field: "estado", headerName: "Estado", width: 120, editable: false },
+    { field: "cobertura", headerName: "Cobertura", width: 120, editable: false },
+    { field: "negocio", headerName: "Negocio", width: 120, editable: false },
+  ];
+
+  // Guarda los cambios al backend
   const handleSave = async () => {
     setLoading(true);
-    // Solo enviar filas modificadas (por ahora, enviar todas)
     try {
-      const result = await updateMatrices(rows);
+      // Solo filas modificadas en factor_prov o clasificacion
+      const modifiedRows: MatrizUpdatePayload[] = rows.filter(row => {
+        const original = originalRows.find(r => r.id_politica_base_riesgo === row.id_politica_base_riesgo);
+        if (!original) return false;
+        return row.factor_prov !== original.factor_prov || row.clasificacion !== original.clasificacion;
+      }).map(row => ({
+        id_politica_base_riesgo: row.id_politica_base_riesgo,
+        factor_prov: row.factor_prov,
+        clasificacion: row.clasificacion
+      }));
+      if (modifiedRows.length === 0) {
+        Swal.fire({
+          icon: "info",
+          title: "Sin cambios",
+          text: "No hay cambios para guardar.",
+        });
+        setLoading(false);
+        return;
+      }
+      const result = await updateMatrices({ rows: modifiedRows });
       if (result.success) {
         Swal.fire({
           icon: "success",
@@ -100,6 +137,8 @@ export default function MatricesPage() {
           text: result.message || "Los cambios se guardaron correctamente.",
         });
         setErrorRows([]);
+        // Actualiza el estado original para futuras ediciones
+        setOriginalRows(rows);
       } else {
         setErrorRows(result.errorRows || []);
         Swal.fire({
@@ -108,7 +147,7 @@ export default function MatricesPage() {
           text: result.message || "Algunas filas no se pudieron guardar.",
         });
       }
-    } catch (e) {
+    } catch {
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -120,30 +159,51 @@ export default function MatricesPage() {
   };
 
   return (
-    <main className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6 text-center">Editar Matrices de Política de Riesgo</h1>
-      <div className="bg-white dark:bg-bone rounded-lg shadow p-4 mb-6">
+    <main className="container mx-auto p-2">
+      <h1 className="text-3xl font-bold mb-6 text-center">
+        Actualizar políticas de base de riesgo
+      </h1>
+      <Box className="bg-white dark:bg-[#232836] rounded-lg shadow p-3 mb-6" sx={{ height: 700, width: '100%' }}>
         <DataGrid
-          columns={columns}
           rows={rows}
-          onRowsChange={onRowsChange}
-          rowKeyGetter={row => row.id_politica_base_riesgo}
-          className="rdg-light"
-          rowClass={(row: MatrizRow) =>
-            errorRows.includes(row.id_politica_base_riesgo)
-              ? "bg-red-100 dark:bg-red-200"
-              : ""
-          }
-          style={{ minHeight: 500 }}
+          columns={columns}
+          getRowId={(row) => row.id_politica_base_riesgo}
+          loading={loading}
+          disableRowSelectionOnClick
+          processRowUpdate={processRowUpdate}
+          onRowSelectionModelChange={(ids) => setSelectionModel(Array.isArray(ids) ? ids : [])}
+          slots={{ toolbar: GridToolbar }}
+          sx={{ fontSize: 15 }}
+          pageSizeOptions={[10, 25, 50, 100]}
+          initialState={{
+            pagination: { paginationModel: { pageSize: 25, page: 0 } },
+            columns: { columnVisibilityModel: { concatenado: true } }
+          }}
         />
-      </div>
-      <button
-        className="px-8 py-3 bg-skyBlue hover:bg-[#4278FA]/80 dark:bg-bone dark:hover:bg-bone/80 text-white dark:text-black font-semibold rounded-lg shadow transition-colors duration-200 text-xl flex items-center justify-center gap-2"
-        onClick={handleSave}
-        disabled={loading}
-      >
-        Guardar cambios
-      </button>
+      </Box>
+      <Box display="flex" justifyContent="space-between" width="100%" mt={2}>
+        <button
+          className="px-8 py-3 bg-skyBlue hover:bg-[#4278FA]/80 dark:bg-bone dark:hover:bg-bone/80 text-white dark:text-black font-semibold rounded-lg shadow transition-colors duration-200 text-xl flex items-center justify-center gap-2"
+          onClick={() => window.location.href = "/riskbase"}
+          style={{ minWidth: 180 }}
+        >
+          Volver a Base de Riesgo
+        </button>
+        <button
+          className="px-8 py-3 bg-skyBlue hover:bg-[#4278FA]/80 dark:bg-bone dark:hover:bg-bone/80 text-white dark:text-black font-semibold rounded-lg shadow transition-colors duration-200 text-xl flex items-center justify-center gap-2"
+          onClick={handleSave}
+          disabled={loading}
+          style={{ minWidth: 180 }}
+        >
+          {loading && (
+            <svg className="animate-spin h-5 w-5 text-white dark:text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+          )}
+          {loading ? "Guardando..." : "Guardar cambios"}
+        </button>
+      </Box>
     </main>
   );
 }

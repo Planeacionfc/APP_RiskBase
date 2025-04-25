@@ -26,6 +26,7 @@ from .database_operations import (
     get_inventario_matriz,
     get_matrices_base_riesgo,
     df_matrices_merge,
+    df_matrices_merge_raw,
     upload_dataframe_to_db,
     export_dataframe_to_excel,
     get_inventory_by_month_year
@@ -60,5 +61,6 @@ __all__ = [
     'calculate_rango_cons_column',
     'calculate_base_riesgo_column',
     'calculate_provision_column',
-    'process_dataframe_columns'
+    'process_dataframe_columns',
+    'df_matrices_merge_raw'
 ]

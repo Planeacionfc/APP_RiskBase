@@ -4,6 +4,6 @@ import { Header } from "./header";
 
 export function ConditionalHeader() {
   const pathname = usePathname();
-  if (pathname === "/login") return null;
+  if (pathname === "/login" || pathname === "/matrices") return null;
   return <Header />;
 }

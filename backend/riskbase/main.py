@@ -16,10 +16,8 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Configuración CORS
 origins = [
-    "*"
-    # Puedes restringir a tu dominio frontend, ej: "http://localhost:3000"
+    "http://localhost:3000",  # Cambia esto por el dominio real si es necesario
 ]
 
 app.add_middleware(

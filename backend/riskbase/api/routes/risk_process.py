@@ -8,19 +8,21 @@ from ..dependencies import get_current_active_user, get_current_admin_user
 from ...services import (
     get_data_sap,
     df_matrices_merge,
+    df_matrices_merge_raw,
     process_dataframe_columns,
     upload_dataframe_to_db,
     get_inventory_by_month_year
 )
 import pandas as pd
 import numpy as np
-from sqlalchemy import create_engine
+from sqlalchemy import update as sqlalchemy_update, Table, MetaData, Column, Integer, String, DECIMAL
 import os
 from datetime import datetime
 import io
 import json
 from pydantic import BaseModel
 import traceback
+from sqlalchemy import create_engine
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
@@ -36,20 +38,15 @@ async def execute_risk_process(
     Permite consultar por mes y año si se especifican como query params.
     """
     try:
-        print(f"[LOG] Params recibidos: mes={mes} anio={anio}")
         # 1. Obtener datos de las matrices de la base de datos
         matrices = df_matrices_merge()
-        print(f"[LOG] Matrices shape: {matrices.shape if hasattr(matrices, 'shape') else type(matrices)}")
 
         # 2. Extraer datos según parámetros
         if mes is not None and anio is not None:
             mes = int(mes)
             anio = int(anio)
-            print(f"[LOG] Consultando get_inventory_by_month_year({mes}, {anio})")
             df_sap = get_inventory_by_month_year(mes, anio)
-            print(f"[LOG] df_sap shape: {df_sap.shape if hasattr(df_sap, 'shape') else type(df_sap)}")
             if df_sap is None or df_sap.empty:
-                print(f"[LOG] Sin datos para mes={mes}, anio={anio}")
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"No se encontraron datos para mes={mes} y año={anio}"
@@ -60,7 +57,6 @@ async def execute_risk_process(
             os.makedirs(temp_dir, exist_ok=True)
             excel_path = os.path.join(temp_dir, excel_file)
             df_sap.to_excel(excel_path, index=False)
-            print(f"[LOG] Excel guardado en: {excel_path}")
             result = {
                 "success": True,
                 "message": "Consulta ejecutada correctamente (datos crudos)",
@@ -71,23 +67,17 @@ async def execute_risk_process(
                     "total_records": len(df_sap),
                 }
             }
-            print(f"[LOG] Consulta cruda finalizada OK")
             return result
         else:
-            print(f"[LOG] Consultando get_data_sap()")
             df_sap = get_data_sap()
-            print(f"[LOG] df_sap shape: {df_sap.shape if hasattr(df_sap, 'shape') else type(df_sap)}")
             if df_sap is None or df_sap.empty:
-                print(f"[LOG] Sin datos de SAP")
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="No se pudieron obtener datos de SAP"
                 )
 
         # 3. Procesar los datos aplicando todas las reglas de negocio
-        print(f"[LOG] Procesando DataFrame con process_dataframe_columns...")
         df_final_combined = process_dataframe_columns(df_sap, matrices)
-        print(f"[LOG] df_final_combined shape: {df_final_combined.shape if hasattr(df_final_combined, 'shape') else type(df_final_combined)}")
 
         # 4. Guardar el DataFrame procesado como archivo Excel para su uso posterior
         excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
@@ -95,7 +85,6 @@ async def execute_risk_process(
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
         df_final_combined.to_excel(excel_path, index=False)
-        print(f"[LOG] Excel guardado en: {excel_path}")
 
         # 5. Devolver estadísticas básicas
         result = {
@@ -109,12 +98,10 @@ async def execute_risk_process(
                 # Agregar más estadísticas relevantes según necesidad
             }
         }
-        print(f"[LOG] Proceso finalizado OK")
         return result
 
     except Exception as e:
         tb = traceback.format_exc()
-        print(f"[ERROR] {str(e)}\n{tb}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al ejecutar el proceso: {str(e)}\n{tb}"
@@ -259,7 +246,7 @@ async def get_matrices(
     """
     try:
         # Obtener datos de la base de datos
-        matrices = df_matrices_merge()
+        matrices = df_matrices_merge_raw()
         
         if matrices is None or matrices.empty:
             raise HTTPException(
@@ -292,65 +279,68 @@ async def update_matrices(
     Actualiza los campos factor_prov y clasificacion en la tabla MatrizBaseRiesgo.
     Solo accesible para administradores.
     """
-    import sqlalchemy
-    from sqlalchemy import update as sqlalchemy_update
-    try:
-        # Recibe una lista de cambios: cada item debe tener id_politica_base_riesgo, factor_prov, clasificacion
-        matrices = data.get("rows") or data.get("matrices") or []
-        if not matrices:
-            raise HTTPException(status_code=400, detail="No se enviaron filas para actualizar.")
-        usuario = os.getenv("DB_USER")
-        pwd     = os.getenv("DB_PASSWORD")
-        server  = os.getenv("DB_SERVER")
-        db      = os.getenv("DATABASE")
-        driver  = "ODBC Driver 17 for SQL Server"
-        engine = create_engine(
-            f"mssql+pyodbc://{usuario}:{pwd}@{server}/{db}?driver={driver}",
-            connect_args={"fast_executemany": True}
-        )
-        errors = []
-        updated = 0
-        with engine.begin() as conn:
-            for row in matrices:
-                id_ = row.get("id_politica_base_riesgo")
-                factor_prov = row.get("factor_prov")
-                clasificacion = row.get("clasificacion")
-                if id_ is None:
-                    errors.append({"id": None, "error": "Falta id_politica_base_riesgo"})
-                    continue
-                stmt = sqlalchemy_update(sqlalchemy.table("MatrizBaseRiesgo")).where(
-                    sqlalchemy.column("id_politica_base_riesgo") == id_
+    # Recibe una lista de cambios: cada item debe tener id_politica_base_riesgo, factor_prov, clasificacion
+    matrices = data.get("rows") or data.get("matrices") or []
+    if not matrices:
+        raise HTTPException(status_code=400, detail="No se enviaron filas para actualizar.")
+    usuario = os.getenv("DB_USER")
+    pwd     = os.getenv("DB_PASSWORD")
+    server  = os.getenv("DB_SERVER")
+    db      = os.getenv("DATABASE")
+    driver  = "ODBC Driver 17 for SQL Server"
+    engine = create_engine(
+        f"mssql+pyodbc://{usuario}:{pwd}@{server}/{db}?driver={driver}",
+        connect_args={"fast_executemany": True}
+    )
+    errors = []
+    updated = 0
+    metadata = MetaData()
+    matriz_table = Table("MatrizBaseRiesgo", metadata,
+        Column("id_politica_base_riesgo", Integer, primary_key=True),
+        Column("concatenado", String(255)),
+        Column("segmento", String(255)),
+        Column("permanencia", String(255)),
+        Column("factor_prov", DECIMAL(10, 2)),
+        Column("clasificacion", String(255)),
+        Column("tipo_matriz", String(255)),
+    )
+    with engine.begin() as conn:
+        for row in matrices:
+            id_ = row.get("id_politica_base_riesgo")
+            factor_prov = row.get("factor_prov")
+            clasificacion = row.get("clasificacion")
+            if id_ is None:
+                errors.append({"id": None, "error": "Falta id_politica_base_riesgo"})
+                continue
+            stmt = sqlalchemy_update(matriz_table).where(
+                matriz_table.c.id_politica_base_riesgo == id_
+            )
+            update_dict = {}
+            if factor_prov is not None:
+                update_dict["factor_prov"] = factor_prov
+            if clasificacion is not None:
+                update_dict["clasificacion"] = clasificacion
+            if not update_dict:
+                errors.append({"id": id_, "error": "Nada para actualizar"})
+                continue
+            try:
+                result = conn.execute(
+                    stmt.values(**update_dict)
                 )
-                update_dict = {}
-                if factor_prov is not None:
-                    update_dict["factor_prov"] = factor_prov
-                if clasificacion is not None:
-                    update_dict["clasificacion"] = clasificacion
-                if not update_dict:
-                    errors.append({"id": id_, "error": "Nada para actualizar"})
-                    continue
-                try:
-                    result = conn.execute(
-                        stmt.values(**update_dict)
-                    )
-                    if result.rowcount == 0:
-                        errors.append({"id": id_, "error": "ID no encontrado"})
-                    else:
-                        updated += result.rowcount
-                except Exception as ex:
-                    errors.append({"id": id_, "error": str(ex)})
-        return {
-            "success": len(errors) == 0,
-            "message": f"{updated} filas actualizadas. {len(errors)} errores.",
-            "rows_updated": updated,
-            "errorRows": [e["id"] for e in errors],
-            "errors": errors
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al actualizar las matrices: {str(e)}"
-        )
+                if result.rowcount == 0:
+                    errors.append({"id": id_, "error": "ID no encontrado"})
+                else:
+                    updated += result.rowcount
+            except Exception as ex:
+                errors.append({"id": id_, "error": str(ex)})
+    return {
+        "success": len(errors) == 0,
+        "message": f"{updated} filas actualizadas. {len(errors)} errores.",
+        "rows_updated": updated,
+        "errorRows": [e["id"] for e in errors],
+        "errors": errors
+    }
+
 
 # Endpoint para eliminar archivo temporal
 @router.delete("/delete-temp-file")

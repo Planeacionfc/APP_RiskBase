@@ -75,6 +75,23 @@ def get_matrices_base_riesgo():
     """
     return execute_query(query)
 
+def df_matrices_merge_raw():
+    """
+    Extrae los datos de ambas tablas y los unifica utilizando pd.merge(),
+    pero NO modifica los campos de texto ni normaliza factor_prov.
+    Devuelve los datos exactamente como están en la base de datos.
+    """
+    df_inventario = get_inventario_matriz()
+    df_matrices = get_matrices_base_riesgo()
+    # Unificación utilizando la columna en común 'id_politica_base_riesgo'
+    df_matrices_merge = pd.merge(
+        df_inventario, df_matrices,
+        on="id_politica_base_riesgo",
+        how="inner"  # Cambia 'inner' por 'left' o 'outer' según lo requieras
+    )
+    # NO se modifica ningún campo
+    return df_matrices_merge
+
 def df_matrices_merge():
     """
     Extrae los datos de ambas tablas, los unifica utilizando pd.merge() y convierte
