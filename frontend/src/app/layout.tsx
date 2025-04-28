@@ -13,6 +13,9 @@ const acidGroteskLight = localFont({ src: "./fonts/acid-grotesk-light.woff" });
 export const metadata: Metadata = {
   title: "PF Manager",
   description: "Aplicativo de Planeación Financiera para gestionar proyectos",
+  icons: {
+    icon: "/image/prebel_favicon.png"
+  }
 };
 
 export default function RootLayout({

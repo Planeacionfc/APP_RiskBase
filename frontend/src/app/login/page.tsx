@@ -36,6 +36,7 @@ export default function LoginPage() {
         setError(data.detail || 'Error al iniciar sesión');
         // Mostrar alerta SweetAlert de error
         showAlert({
+          position: "center",
           icon: "error",
           title: "Oops...",
           text: "Usuario o contraseña incorrectos"

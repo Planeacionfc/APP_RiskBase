@@ -50,11 +50,34 @@ export default function RiskBasePage() {
         setProcessing(false);
         return;
       }
-      if (!response.ok) throw new Error("Error al procesar datos");
+      if (!response.ok) {
+        await showAlert({
+          position: "center",
+          icon: "error",
+          title: "Error al procesar datos",
+          text: "Ocurrió un error al procesar los datos. Por favor, inténtalo nuevamente o contacta al administrador.",
+          showConfirmButton: true,
+          confirmButtonText: "OK"
+        });
+        setProcessing(false);
+        return;
+      }
       const result = await response.json();
       const excelFileName = result.excel_file;
-      if (!excelFileName) throw new Error("No se recibió el archivo Excel generado");
+      if (!excelFileName) {
+        await showAlert({
+          position: "center",
+          icon: "error",
+          title: "Error al procesar datos",
+          text: "Ocurrió un error al procesar los datos. Por favor, inténtalo nuevamente o contacta al administrador.",
+          showConfirmButton: true,
+          confirmButtonText: "OK"
+        });
+        setProcessing(false);
+        return;
+      }
       setExcelFile(excelFileName);
+      
       // Obtener los datos procesados desde /risk/data-view
       const dfRes = await fetch(`${API_URL}/risk/data-view?temp_file=${excelFileName}`, {
         headers: {
@@ -70,7 +93,18 @@ export default function RiskBasePage() {
         setProcessing(false);
         return;
       }
-      if (!dfRes.ok) throw new Error("Error al obtener los datos procesados");
+      if (!dfRes.ok) {
+        await showAlert({
+          position: "center",
+          icon: "error",
+          title: "Error al obtener los datos procesados",
+          text: "Ocurrió un error al obtener los datos procesados. Por favor, inténtalo nuevamente o contacta al administrador.",
+          showConfirmButton: true,
+          confirmButtonText: "OK"
+        });
+        setProcessing(false);
+        return;
+      }
       const df = await dfRes.json();
       setColumns(df.columns || []);
       setData((df.data || []).map((row: any) => {
@@ -109,13 +143,19 @@ export default function RiskBasePage() {
       icon: 'info',
       html: `
         <p>Por favor, ingresa el mes y año para consultar los registros.</p>
-        <input id="swal-mes"  class="swal2-input" placeholder="Mes"  type="number" min="1" max="12"/>
-        <input id="swal-anio" class="swal2-input" placeholder="Año" type="number"/>
+        <input id="swal-mes"  class="swal2-input" placeholder="Mes"  type="number" min="1" max="12" style="border: 2px solid #4d5461; border-radius: 6px; box-shadow: 0 0 0 1px #4d5461; color: #202020; background: #fff;" />
+        <input id="swal-anio" class="swal2-input" placeholder="Año" type="number" style="border: 2px solid #4d5461; border-radius: 6px; box-shadow: 0 0 0 1px #4d5461; color: #202020; background: #fff;" />
+        <style>
+          #swal-mes::placeholder, #swal-anio::placeholder {
+            color: #444 !important;
+            opacity: 1 !important;
+          }
+        </style>
       `,
       preConfirm: () => {
         const mes  = Number((document.getElementById("swal-mes")  as HTMLInputElement).value);
         const anio = Number((document.getElementById("swal-anio") as HTMLInputElement).value);
-        if(!mes||mes<1||mes>12||!anio) Swal.showValidationMessage("Mes 1-12 y año válido");
+        if(!mes||mes<1||mes>12||!anio) Swal.showValidationMessage("Por favor ingresa un mes de 1-12 y un año válido");
         return {mes,anio};
       },
       showCancelButton: true, confirmButtonText:"Consultar"
@@ -142,7 +182,18 @@ export default function RiskBasePage() {
     setError("");
     try {
       const token = getToken();
-      if (!excelFile) throw new Error("No hay archivo Excel generado para guardar en BD");
+      if (!excelFile) {
+        await showAlert({
+          position: "center",
+          icon: "error",
+          title: "No hay archivo Excel generado",
+          text: "Primero debes procesar los datos y generar el archivo Excel antes de guardar en la base de datos.",
+          showConfirmButton: true,
+          confirmButtonText: "OK"
+        });
+        setSaving(false);
+        return;
+      }
       const response = await fetch(`${API_URL}/risk/save-to-db`, {
         method: "POST",
         headers: {
@@ -160,7 +211,17 @@ export default function RiskBasePage() {
         setSaving(false);
         return;
       }
-      if (!response.ok) throw new Error("Error al guardar en BD");
+      if (!response.ok) {
+        await showAlert({
+          position: "center",
+          icon: "error",
+          title: "Error al guardar en BD",
+          text: "Ocurrió un error al guardar los datos en la base de datos. Por favor, inténtalo nuevamente o contacta al administrador.",
+          showConfirmButton: true,
+          confirmButtonText: "OK"
+        });
+        throw new Error("Error al guardar en BD");
+      }
       // Eliminar el archivo temporal después de guardar en BD
       await fetch(`${API_URL}/risk/delete-temp-file?filename=${excelFile}`, {
         method: "DELETE",
@@ -189,7 +250,18 @@ export default function RiskBasePage() {
     setError("");
     try {
       const token = getToken();
-      if (!excelFile) throw new Error("No hay archivo Excel generado para exportar");
+      if (!excelFile) {
+        await showAlert({
+          position: "center",
+          icon: "error",
+          title: "No hay archivo Excel generado",
+          text: "Primero debes procesar los datos y generar el archivo Excel antes de exportar.",
+          showConfirmButton: true,
+          confirmButtonText: "OK"
+        });
+        setLoading(false);
+        return;
+      }
       const response = await fetch(`${API_URL}/risk/export-excel?filename=${excelFile}`, {
         method: "GET",
         headers: {
@@ -205,7 +277,17 @@ export default function RiskBasePage() {
         setLoading(false);
         return;
       }
-      if (!response.ok) throw new Error("Error al exportar Excel");
+      if (!response.ok) {
+        await showAlert({
+          position: "center",
+          icon: "error",
+          title: "Error al exportar Excel",
+          text: "Ocurrió un error al exportar los datos a Excel. Por favor, inténtalo nuevamente o contacta al administrador.",
+          showConfirmButton: true,
+          confirmButtonText: "OK"
+        });
+        throw new Error("Error al exportar Excel");
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -231,7 +313,7 @@ export default function RiskBasePage() {
         y actualizar su política.
         <span className="bg-yellow-100 text-yellow-800 p-2 rounded-lg block mt-4">
           <strong>Nota:</strong> Primero debe descargar el archivo Excel y luego guardar la información en la base de datos.
-          Al subir la información a la BD se elimina el archivo temporal con la información y deberá realizar el proceso nuevamente.
+          Al subir la información a la base de datos se elimina el archivo temporal con la información y deberá realizar el proceso nuevamente.
         </span>
       </p>
       

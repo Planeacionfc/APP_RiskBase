@@ -59,7 +59,7 @@ async def execute_risk_process(
             df_sap.to_excel(excel_path, index=False)
             result = {
                 "success": True,
-                "message": "Consulta ejecutada correctamente (datos crudos)",
+                "message": "Consulta ejecutada correctamente",
                 "rows_processed": len(df_sap),
                 "columns": df_sap.columns.tolist(),
                 "excel_file": excel_file,

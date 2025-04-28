@@ -96,7 +96,7 @@ export default function MatricesPage() {
     { field: "id_politica_base_riesgo", headerName: "ID Política", width: 120, editable: false },
     { field: "concatenado", headerName: "Concatenado", width: 180, editable: false },
     { field: "segmento", headerName: "Segmento", width: 140, editable: false },
-    { field: "permanencia", headerName: "Permanencia", width: 140, editable: false },
+    { field: "permanencia", headerName: "Permanencia", width: 140, editable: true },
     { field: "factor_prov", headerName: "Factor Prov", width: 120, editable: true, type: 'number' },
     { field: "clasificacion", headerName: "Clasificación", width: 140, editable: true },
     { field: "tipo_matriz", headerName: "Tipo Matriz", width: 140, editable: false },
@@ -163,6 +163,14 @@ export default function MatricesPage() {
       <h1 className="text-3xl font-bold mb-6 text-center">
         Actualizar políticas de base de riesgo
       </h1>
+
+      <p className="text-center text-gray-700 dark:text-gray-300 mb-8">
+        En esta sección se realizan las actualizaciones de la política de la base de riesgo.
+        <span className="bg-yellow-100 text-yellow-800 p-2 rounded-lg block mt-4">
+          <strong>Nota:</strong> Trata de evitar errores ortográficos o de sintaxis y seguir el mismo formato que ves en la tabla.
+          Puedes filtrar, organizar y ocultar columnas para facilitar la edición.
+        </span>
+      </p>
       <Box className="bg-white dark:bg-[#232836] rounded-lg shadow p-3 mb-6" sx={{ height: 700, width: '100%' }}>
         <DataGrid
           rows={rows}
