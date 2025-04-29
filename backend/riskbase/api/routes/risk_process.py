@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, File, UploadFile, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
 from ...domain.models.user import User
 from ..dependencies import get_current_active_user, get_current_admin_user
@@ -15,14 +14,14 @@ from ...services import (
 )
 import pandas as pd
 import numpy as np
-from sqlalchemy import update as sqlalchemy_update, Table, MetaData, Column, Integer, String, DECIMAL
+from sqlalchemy import (
+    create_engine, MetaData, Table, Column, Integer, String, DECIMAL,
+    select, insert, update as sqlalchemy_update
+)
 import os
 from datetime import datetime
-import io
-import json
 from pydantic import BaseModel
 import traceback
-from sqlalchemy import create_engine
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
@@ -276,13 +275,15 @@ async def update_matrices(
     current_user: User = Depends(get_current_admin_user)
 ):
     """
-    Actualiza los campos factor_prov y clasificacion en la tabla MatrizBaseRiesgo.
-    Solo accesible para administradores.
+    Actualiza los campos factor_prov y clasificacion en MatrizBaseRiesgo,
+    guardando previamente el estado antiguo en MatrizBaseRiesgoHist.
+    Sólo administradores.
     """
-    # Recibe una lista de cambios: cada item debe tener id_politica_base_riesgo, factor_prov, clasificacion
     matrices = data.get("rows") or data.get("matrices") or []
     if not matrices:
         raise HTTPException(status_code=400, detail="No se enviaron filas para actualizar.")
+
+    # Conexión
     usuario = os.getenv("DB_USER")
     pwd     = os.getenv("DB_PASSWORD")
     server  = os.getenv("DB_SERVER")
@@ -292,47 +293,163 @@ async def update_matrices(
         f"mssql+pyodbc://{usuario}:{pwd}@{server}/{db}?driver={driver}",
         connect_args={"fast_executemany": True}
     )
+
+    metadata = MetaData()
+    # Tabla principal
+    matriz_table = Table(
+        "MatrizBaseRiesgo", metadata,
+        Column("id_politica_base_riesgo", Integer, primary_key=True),
+        Column("concatenado",           String(255)),
+        Column("segmento",              String(255)),
+        Column("permanencia",           String(255)),
+        Column("factor_prov",           DECIMAL(10, 2)),
+        Column("clasificacion",         String(255)),
+        Column("tipo_matriz",           String(255)),
+        schema=None  # añade tu schema si aplica
+    )
+
+    inventario_table = Table(
+        "InventarioMatriz", metadata,
+        Column("id_inventario_matriz", Integer, primary_key=True),
+        Column("id_politica_base_riesgo", Integer),
+        Column("subsegmento", String(255)),
+        Column("estado", String(255)),
+        Column("cobertura", String(255)),
+        Column("negocio", String(255)),
+    )
+
+    # Tabla histórica
+    hist_table = Table(
+        "MatrizBaseRiesgoHist", metadata,
+        Column("hist_id",                 Integer, primary_key=True),
+        Column("id_politica_base_riesgo", Integer),
+        Column("concatenado",             String(255)),
+        Column("segmento",                String(255)),
+        Column("permanencia",             String(255)),
+        Column("factor_prov",             DECIMAL(10, 2)),
+        Column("clasificacion",           String(255)),
+        Column("tipo_matriz",             String(255)),
+        Column("subsegmento",             String(255)),
+        Column("estado",                  String(255)),
+        Column("cobertura",               String(255)),
+        Column("negocio",                 String(255)),
+        # fecha_registro se llena con el DEFAULT GETDATE()
+        schema=None
+    )
+
     errors = []
     updated = 0
-    metadata = MetaData()
-    matriz_table = Table("MatrizBaseRiesgo", metadata,
-        Column("id_politica_base_riesgo", Integer, primary_key=True),
-        Column("concatenado", String(255)),
-        Column("segmento", String(255)),
-        Column("permanencia", String(255)),
-        Column("factor_prov", DECIMAL(10, 2)),
-        Column("clasificacion", String(255)),
-        Column("tipo_matriz", String(255)),
-    )
+
     with engine.begin() as conn:
+        # 0) SNAPSHOT COMPLETO: Guardar todos los registros actuales en el histórico antes de cualquier update
+        try:
+            snapshot_stmt = select(
+                matriz_table.c.id_politica_base_riesgo,
+                matriz_table.c.concatenado,
+                matriz_table.c.segmento,
+                matriz_table.c.permanencia,
+                matriz_table.c.factor_prov,
+                matriz_table.c.clasificacion,
+                matriz_table.c.tipo_matriz,
+                inventario_table.c.subsegmento,
+                inventario_table.c.estado,
+                inventario_table.c.cobertura,
+                inventario_table.c.negocio
+            ).select_from(
+                matriz_table.outerjoin(
+                    inventario_table,
+                    matriz_table.c.id_politica_base_riesgo == inventario_table.c.id_politica_base_riesgo
+                )
+            )
+            snapshot_rows = conn.execute(snapshot_stmt).fetchall()
+            if snapshot_rows:
+                conn.execute(
+                    insert(hist_table),
+                    [dict(r._mapping) for r in snapshot_rows]
+                )
+        except Exception as ex:
+            pass
+
         for row in matrices:
             id_ = row.get("id_politica_base_riesgo")
-            factor_prov = row.get("factor_prov")
-            clasificacion = row.get("clasificacion")
             if id_ is None:
                 errors.append({"id": None, "error": "Falta id_politica_base_riesgo"})
                 continue
-            stmt = sqlalchemy_update(matriz_table).where(
-                matriz_table.c.id_politica_base_riesgo == id_
-            )
-            update_dict = {}
-            if factor_prov is not None:
-                update_dict["factor_prov"] = factor_prov
-            if clasificacion is not None:
-                update_dict["clasificacion"] = clasificacion
-            if not update_dict:
+
+            # 1) Recuperar estado actual (JOIN para snapshot)
+            try:
+                join_stmt = select(
+                    matriz_table,
+                    inventario_table.c.subsegmento,
+                    inventario_table.c.estado,
+                    inventario_table.c.cobertura,
+                    inventario_table.c.negocio
+                ).select_from(
+                    matriz_table.outerjoin(
+                        inventario_table,
+                        matriz_table.c.id_politica_base_riesgo == inventario_table.c.id_politica_base_riesgo
+                    )
+                ).where(matriz_table.c.id_politica_base_riesgo == id_)
+                current = conn.execute(join_stmt).first()
+            except Exception as ex:
+                errors.append({"id": id_, "error": f"Consulta fallida: {ex}"})
+                continue
+            if not current:
+                errors.append({"id": id_, "error": "ID no encontrado"})
+                continue
+
+            # 2) Insertar snapshot en el histórico
+            try:
+                conn.execute(
+                    insert(hist_table).values(
+                        id_politica_base_riesgo = current.id_politica_base_riesgo,
+                        concatenado             = current.concatenado,
+                        segmento                = current.segmento,
+                        permanencia             = current.permanencia,
+                        factor_prov             = current.factor_prov,
+                        clasificacion           = current.clasificacion,
+                        tipo_matriz             = current.tipo_matriz,
+                        subsegmento             = current.subsegmento,
+                        estado                  = current.estado,
+                        cobertura               = current.cobertura,
+                        negocio                 = current.negocio
+                    )
+                )
+            except Exception as ex:
+                errors.append({"id": id_, "error": f"Histórico fallido: {ex}"})
+                continue
+
+            # 3) Actualizar ambas tablas según corresponda
+            matriz_fields = [
+                "concatenado", "segmento", "permanencia", "factor_prov", "clasificacion", "tipo_matriz"
+            ]
+            inventario_fields = ["subsegmento", "estado", "cobertura", "negocio"]
+            update_dict_matriz = {field: row[field] for field in matriz_fields if field in row and row[field] is not None}
+            update_dict_inventario = {field: row[field] for field in inventario_fields if field in row and row[field] is not None}
+
+            if not update_dict_matriz and not update_dict_inventario:
                 errors.append({"id": id_, "error": "Nada para actualizar"})
                 continue
-            try:
-                result = conn.execute(
-                    stmt.values(**update_dict)
+            # Update MatrizBaseRiesgo
+            if update_dict_matriz:
+                stmt = sqlalchemy_update(matriz_table).where(
+                    matriz_table.c.id_politica_base_riesgo == id_
                 )
-                if result.rowcount == 0:
-                    errors.append({"id": id_, "error": "ID no encontrado"})
-                else:
+                try:
+                    result = conn.execute(stmt.values(**update_dict_matriz))
                     updated += result.rowcount
-            except Exception as ex:
-                errors.append({"id": id_, "error": str(ex)})
+                except Exception as ex:
+                    errors.append({"id": id_, "error": str(ex)})
+            # Update InventarioMatriz
+            if update_dict_inventario:
+                stmt_inv = sqlalchemy_update(inventario_table).where(
+                    inventario_table.c.id_politica_base_riesgo == id_
+                )
+                try:
+                    result_inv = conn.execute(stmt_inv.values(**update_dict_inventario))
+                    updated += result_inv.rowcount
+                except Exception as ex:
+                    errors.append({"id": id_, "error": str(ex)})
     return {
         "success": len(errors) == 0,
         "message": f"{updated} filas actualizadas. {len(errors)} errores.",

@@ -21,8 +21,16 @@ interface MatrizRow {
 
 interface MatrizUpdatePayload {
   id_politica_base_riesgo: number;
+  concatenado: string;
+  segmento: string;
+  permanencia: string;
   factor_prov: number;
   clasificacion: string;
+  tipo_matriz: string;
+  subsegmento: string;
+  estado: string;
+  cobertura: string;
+  negocio: string;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -94,31 +102,51 @@ export default function MatricesPage() {
   // Columnas para MUI DataGrid
   const columns: GridColDef[] = [
     { field: "id_politica_base_riesgo", headerName: "ID Política", width: 120, editable: false },
-    { field: "concatenado", headerName: "Concatenado", width: 180, editable: false },
-    { field: "segmento", headerName: "Segmento", width: 140, editable: false },
+    { field: "concatenado", headerName: "Concatenado", width: 180, editable: true },
+    { field: "segmento", headerName: "Segmento", width: 140, editable: true },
     { field: "permanencia", headerName: "Permanencia", width: 140, editable: true },
     { field: "factor_prov", headerName: "Factor Prov", width: 120, editable: true, type: 'number' },
     { field: "clasificacion", headerName: "Clasificación", width: 140, editable: true },
-    { field: "tipo_matriz", headerName: "Tipo Matriz", width: 140, editable: false },
-    { field: "subsegmento", headerName: "Subsegmento", width: 140, editable: false },
-    { field: "estado", headerName: "Estado", width: 120, editable: false },
-    { field: "cobertura", headerName: "Cobertura", width: 120, editable: false },
-    { field: "negocio", headerName: "Negocio", width: 120, editable: false },
+    { field: "tipo_matriz", headerName: "Tipo Matriz", width: 140, editable: true },
+    { field: "subsegmento", headerName: "Subsegmento", width: 140, editable: true },
+    { field: "estado", headerName: "Estado", width: 120, editable: true },
+    { field: "cobertura", headerName: "Cobertura", width: 120, editable: true },
+    { field: "negocio", headerName: "Negocio", width: 120, editable: true },
   ];
 
   // Guarda los cambios al backend
   const handleSave = async () => {
     setLoading(true);
     try {
-      // Solo filas modificadas en factor_prov o clasificacion
-      const modifiedRows: MatrizUpdatePayload[] = rows.filter(row => {
+      // Solo filas modificadas en cualquier campo editable excepto el id
+      const modifiedRows = rows.filter(row => {
         const original = originalRows.find(r => r.id_politica_base_riesgo === row.id_politica_base_riesgo);
         if (!original) return false;
-        return row.factor_prov !== original.factor_prov || row.clasificacion !== original.clasificacion;
+        // Compara TODOS los campos editables excepto el id
+        return (
+          row.concatenado !== original.concatenado ||
+          row.segmento !== original.segmento ||
+          row.permanencia !== original.permanencia ||
+          row.factor_prov !== original.factor_prov ||
+          row.clasificacion !== original.clasificacion ||
+          row.tipo_matriz !== original.tipo_matriz ||
+          row.subsegmento !== original.subsegmento ||
+          row.estado !== original.estado ||
+          row.cobertura !== original.cobertura ||
+          row.negocio !== original.negocio
+        );
       }).map(row => ({
         id_politica_base_riesgo: row.id_politica_base_riesgo,
+        concatenado: row.concatenado,
+        segmento: row.segmento,
+        permanencia: row.permanencia,
         factor_prov: row.factor_prov,
-        clasificacion: row.clasificacion
+        clasificacion: row.clasificacion,
+        tipo_matriz: row.tipo_matriz,
+        subsegmento: row.subsegmento,
+        estado: row.estado,
+        cobertura: row.cobertura,
+        negocio: row.negocio
       }));
       if (modifiedRows.length === 0) {
         Swal.fire({
@@ -134,10 +162,9 @@ export default function MatricesPage() {
         Swal.fire({
           icon: "success",
           title: "Cambios guardados",
-          text: result.message || "Los cambios se guardaron correctamente.",
+          text: "Los cambios se guardaron correctamente.",
         });
         setErrorRows([]);
-        // Actualiza el estado original para futuras ediciones
         setOriginalRows(rows);
       } else {
         setErrorRows(result.errorRows || []);
@@ -147,11 +174,11 @@ export default function MatricesPage() {
           text: result.message || "Algunas filas no se pudieron guardar.",
         });
       }
-    } catch {
+    } catch (error) {
       Swal.fire({
         icon: "error",
-        title: "Error",
-        text: "No se pudo guardar los cambios.",
+        title: "Error inesperado",
+        text: "Ocurrió un error al intentar guardar los cambios.",
       });
     } finally {
       setLoading(false);
