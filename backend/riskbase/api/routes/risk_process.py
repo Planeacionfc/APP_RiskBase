@@ -25,67 +25,28 @@ import traceback
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
-# Endpoint para ejecutar el proceso completo (usuarios regulares y administradores)
 @router.post("/process", response_model=Dict[str, Any])
-async def execute_risk_process(
-    mes: Optional[int] = Query(None, ge=1, le=12),
-    anio: Optional[int] = Query(None, ge=2000),
-    current_user: User = Depends(get_current_active_user)
+async def process_riskbase(
+    current_user: User = Depends(get_current_admin_user)
 ):
     """
     Ejecuta el proceso completo de extracción, transformación y carga de datos de riesgo.
-    Permite consultar por mes y año si se especifican como query params.
+    Solo accesible para administradores.
     """
     try:
-        # 1. Obtener datos de las matrices de la base de datos
         matrices = df_matrices_merge()
-
-        # 2. Extraer datos según parámetros
-        if mes is not None and anio is not None:
-            mes = int(mes)
-            anio = int(anio)
-            df_sap = get_inventory_by_month_year(mes, anio)
-            if df_sap is None or df_sap.empty:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"No se encontraron datos para mes={mes} y año={anio}"
-                )
-            # --- DEVOLVER DATOS CRUDOS ---
-            excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
-            temp_dir = os.environ.get("TEMP_DIR")
-            os.makedirs(temp_dir, exist_ok=True)
-            excel_path = os.path.join(temp_dir, excel_file)
-            df_sap.to_excel(excel_path, index=False)
-            result = {
-                "success": True,
-                "message": "Consulta ejecutada correctamente",
-                "rows_processed": len(df_sap),
-                "columns": df_sap.columns.tolist(),
-                "excel_file": excel_file,
-                "summary": {
-                    "total_records": len(df_sap),
-                }
-            }
-            return result
-        else:
-            df_sap = get_data_sap()
-            if df_sap is None or df_sap.empty:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="No se pudieron obtener datos de SAP"
-                )
-
-        # 3. Procesar los datos aplicando todas las reglas de negocio
+        df_sap = get_data_sap()
+        if df_sap is None or df_sap.empty:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No se pudieron obtener datos de SAP"
+            )
         df_final_combined = process_dataframe_columns(df_sap, matrices)
-
-        # 4. Guardar el DataFrame procesado como archivo Excel para su uso posterior
         excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
         temp_dir = os.environ.get("TEMP_DIR")
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
         df_final_combined.to_excel(excel_path, index=False)
-
-        # 5. Devolver estadísticas básicas
         result = {
             "success": True,
             "message": "Proceso ejecutado correctamente",
@@ -94,16 +55,57 @@ async def execute_risk_process(
             "excel_file": excel_file,
             "summary": {
                 "total_records": len(df_final_combined),
-                # Agregar más estadísticas relevantes según necesidad
             }
         }
         return result
-
     except Exception as e:
         tb = traceback.format_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al ejecutar el proceso: {str(e)}\n{tb}"
+        )
+
+@router.post("/consult-riskbase", response_model=Dict[str, Any])
+async def consult_riskbase(
+    mes: int = Query(..., ge=1, le=12),
+    anio: int = Query(..., ge=2000),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Consulta la base de riesgo por mes y año, guarda el DataFrame como archivo Excel temporal y devuelve la info necesaria.
+    Accesible para usuarios regulares y administradores.
+    """
+    try:
+        matrices = df_matrices_merge()
+        df_sap = get_inventory_by_month_year(mes, anio)
+        if df_sap is None or df_sap.empty:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No se encontraron datos para mes={mes} y año={anio}"
+            )
+        # Procesar los datos aplicando reglas de negocio
+        df_final_combined = process_dataframe_columns(df_sap, matrices)
+        excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+        temp_dir = os.environ.get("TEMP_DIR")
+        os.makedirs(temp_dir, exist_ok=True)
+        excel_path = os.path.join(temp_dir, excel_file)
+        df_final_combined.to_excel(excel_path, index=False)
+        result = {
+            "success": True,
+            "message": "Consulta ejecutada correctamente",
+            "rows_processed": len(df_final_combined),
+            "columns": df_final_combined.columns.tolist(),
+            "excel_file": excel_file,
+            "summary": {
+                "total_records": len(df_final_combined),
+            }
+        }
+        return result
+    except Exception as e:
+        tb = traceback.format_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al consultar la base de riesgo: {str(e)}\n{tb}"
         )
 
 # Endpoint para visualizar el dataframe (usuarios regulares y administradores)
@@ -463,7 +465,7 @@ async def update_matrices(
 @router.delete("/delete-temp-file")
 async def delete_temp_file(
     filename: str = None,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_admin_user)
 ):
     """
     Elimina un archivo temporal Excel de la carpeta temp.

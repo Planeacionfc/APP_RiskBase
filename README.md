@@ -98,7 +98,7 @@ npm run dev
 ```
 El frontend estará disponible por defecto en [http://localhost:3000](http://localhost:3000)
 
-> 💡 Si necesitas configurar variables de entorno para el frontend (por ejemplo, la URL del backend), crea un archivo `.env.local` en la carpeta `frontend` con las variables necesarias. Consulta la documentación de tu equipo para más detalles.
+> 💡 Si necesitas configurar variables de entorno, crea un archivo `.env` en la carpeta `frontend` y la carpeta `backend` con las variables necesarias. En el archivo `.env.example` puedes ver el ejemplo.
 
 ---
 

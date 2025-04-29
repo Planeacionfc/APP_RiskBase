@@ -1,6 +1,13 @@
 "use client";
 import React, { useState } from "react";
 import { showAlert } from "../../utils/swal";
+import { jwtDecode } from 'jwt-decode';
+
+// --- INTERFAZ PARA JWT ---
+interface JwtPayloadWithRole {
+  role?: string;
+  [key: string]: any;
+}
 
 export default function RiskBasePage() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -129,14 +136,118 @@ export default function RiskBasePage() {
     }
   };
 
-  // Procesar: llama a callProcess() sin parámetros
+  // Procesar: llama a /risk/process (solo admins)
   const handleProcess = async () => {
+    if (!checkAdminRole()) {
+      await show403Alert();
+      return;
+    }
     await callProcess();
+  };
+
+  // Llama a /risk/consult-riskbase (con mes/anio) y luego obtiene los datos desde /risk/data-view
+  const callConsultRiskBase = async (mes: number, anio: number) => {
+    setExtracting(true);
+    setError("");
+    try {
+      const token = getToken();
+      const url = `${API_URL}/risk/consult-riskbase?mes=${mes}&anio=${anio}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+      if (response.status === 401) {
+        await showAlert({
+          icon: 'error',
+          title: 'No autorizado',
+          text: 'No estás autorizado o tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+        });
+        setExtracting(false);
+        return;
+      }
+      if (!response.ok) {
+        await showAlert({
+          position: "center",
+          icon: "error",
+          title: "Error al consultar base de riesgo",
+          text: "Ocurrió un error al consultar la base de riesgo. Por favor, inténtalo nuevamente o contacta al administrador.",
+          showConfirmButton: true,
+          confirmButtonText: "OK"
+        });
+        setExtracting(false);
+        return;
+      }
+      const result = await response.json();
+      const excelFileName = result.excel_file;
+      if (!excelFileName) {
+        await showAlert({
+          position: "center",
+          icon: "error",
+          title: "Error al consultar base de riesgo",
+          text: "No se generó el archivo temporal. Por favor, inténtalo nuevamente o contacta al administrador.",
+          showConfirmButton: true,
+          confirmButtonText: "OK"
+        });
+        setProcessing(false);
+        return;
+      }
+      setExcelFile(excelFileName);
+      // Obtener los datos procesados desde /risk/data-view
+      const dfRes = await fetch(`${API_URL}/risk/data-view?temp_file=${excelFileName}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      if (dfRes.status === 401) {
+        await showAlert({
+          icon: 'error',
+          title: 'No autorizado',
+          text: 'No estás autorizado o tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+        });
+        setProcessing(false);
+        return;
+      }
+      if (!dfRes.ok) {
+        await showAlert({
+          position: "center",
+          icon: "error",
+          title: "Error al obtener los datos procesados",
+          text: "Ocurrió un error al obtener los datos procesados. Por favor, inténtalo nuevamente o contacta al administrador.",
+          showConfirmButton: true,
+          confirmButtonText: "OK"
+        });
+        setProcessing(false);
+        return;
+      }
+      const df = await dfRes.json();
+      setColumns(df.columns || []);
+      setData((df.data || []).map((row: any) => {
+        const rowObj: any = {};
+        (df.columns || []).forEach((col: string) => {
+          rowObj[col] = row[col];
+        });
+        return rowObj;
+      }));
+      await showAlert({
+        position: "center",
+        icon: 'success',
+        title: '¡Consulta exitosa!',
+        text: 'La consulta de la base de riesgo ha terminado exitosamente.',
+        showConfirmButton: true,
+        confirmButtonText: 'OK'
+      });
+    } catch (err: any) {
+      setError(err.message || "Error inesperado");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   // Consultar por mes y año
   const handleConsult = async () => {
-    
     const Swal = (await import('sweetalert2')).default;
     const { value } = await Swal.fire({
       title: "Consultar registros de Base de Riesgo",
@@ -144,9 +255,11 @@ export default function RiskBasePage() {
       html: `
         <p>Por favor, ingresa el mes y año para consultar los registros.</p>
         <input id="swal-mes"  class="swal2-input" placeholder="Mes"  type="number" min="1" max="12" style="border: 2px solid #4d5461; border-radius: 6px; box-shadow: 0 0 0 1px #4d5461; color: #202020; background: #fff;" />
-        <input id="swal-anio" class="swal2-input" placeholder="Año" type="number" style="border: 2px solid #4d5461; border-radius: 6px; box-shadow: 0 0 0 1px #4d5461; color: #202020; background: #fff;" />
+        <input id="swal-anio" class="swal2-input" placeholder="Año" type="number" min="2000" max="2100" style="border: 2px solid #4d5461; border-radius: 6px; box-shadow: 0 0 0 1px #4d5461; color: #202020; background: #fff;" />
         <style>
-          #swal-mes::placeholder, #swal-anio::placeholder {
+          .swal2-input {
+            margin: 10px 0;
+            font-size: 1.1em;
             color: #444 !important;
             opacity: 1 !important;
           }
@@ -160,11 +273,40 @@ export default function RiskBasePage() {
       },
       showCancelButton: true, confirmButtonText:"Consultar"
     });
-    if(value) await callProcess(value.mes, value.anio);
+    if(value) await callConsultRiskBase(value.mes, value.anio);
   };
+
+  // ALERTA 403 PARA ACCIONES DE ADMIN
+  const show403Alert = async () => {
+    await showAlert({
+      position: "center",
+      icon: 'warning',
+      title: 'Permiso denegado',
+      text: 'No tienes permisos para realizar esta acción. Si crees que es un error, contacta al administrador.',
+      showConfirmButton: true,
+      confirmButtonText: 'OK'
+    });
+  };
+
+  // Función para validar el rol de administrador
+  function checkAdminRole() {
+    if (typeof window === 'undefined') return false;
+    const token = localStorage.getItem('token');
+    if (!token) return false;
+    try {
+      const payload = jwtDecode<JwtPayloadWithRole>(token);
+      return payload.role === 'admin';
+    } catch {
+      return false;
+    }
+  }
 
   // Guardar en BD con confirmación
   const handleSaveToDB = async () => {
+    if (!checkAdminRole()) {
+      await show403Alert();
+      return;
+    }
     const confirm = await showAlert({
       position: "center",
       title: '¿Estás seguro?',
@@ -187,13 +329,14 @@ export default function RiskBasePage() {
           position: "center",
           icon: "error",
           title: "No hay archivo Excel generado",
-          text: "Primero debes procesar los datos y generar el archivo Excel antes de guardar en la base de datos.",
+          text: "Primero debes procesar los datos y generar el archivo Excel antes de exportar.",
           showConfirmButton: true,
           confirmButtonText: "OK"
         });
         setSaving(false);
         return;
       }
+      // Guardar en la base de datos
       const response = await fetch(`${API_URL}/risk/save-to-db`, {
         method: "POST",
         headers: {
@@ -202,33 +345,26 @@ export default function RiskBasePage() {
         },
         body: JSON.stringify({ filename: excelFile })
       });
-      if (response.status === 401) {
-        await showAlert({
-          icon: 'error',
-          title: 'No autorizado',
-          text: 'No estás autorizado o tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
-        });
+      if (response.status === 403) {
+        await show403Alert();
         setSaving(false);
         return;
       }
       if (!response.ok) {
-        await showAlert({
-          position: "center",
-          icon: "error",
-          title: "Error al guardar en BD",
-          text: "Ocurrió un error al guardar los datos en la base de datos. Por favor, inténtalo nuevamente o contacta al administrador.",
-          showConfirmButton: true,
-          confirmButtonText: "OK"
-        });
-        throw new Error("Error al guardar en BD");
+        throw new Error("Error al guardar en la base de datos");
       }
       // Eliminar el archivo temporal después de guardar en BD
-      await fetch(`${API_URL}/risk/delete-temp-file?filename=${excelFile}`, {
+      const delRes = await fetch(`${API_URL}/risk/delete-temp-file?filename=${excelFile}`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${token}`
         }
       });
+      if (delRes.status === 403) {
+        await show403Alert();
+        setSaving(false);
+        return;
+      }
       await showAlert({
         position: "center",
         icon: 'success',
@@ -312,8 +448,9 @@ export default function RiskBasePage() {
         También es posible consultar información de la base de riesgo que ha sido almacenada en la base de datos de meses anteriores
         y actualizar su política.
         <span className="bg-yellow-100 text-yellow-800 p-2 rounded-lg block mt-4">
-          <strong>Nota:</strong> Primero debe descargar el archivo Excel y luego guardar la información en la base de datos.
-          Al subir la información a la base de datos se elimina el archivo temporal con la información y deberá realizar el proceso nuevamente.
+          <strong>Nota:</strong> Luego de procesar los datos de la base de riesgo debes descargar el archivo Excel y luego guardar la información en la base de datos.
+          Al subir la información a la base de datos se elimina el archivo temporal con la información y deberás realizar el proceso nuevamente (solo usuarios administradores).
+          Los usuarios regulares solo pueden consultar la información de la base de riesgo y descargar el archivo Excel.
         </span>
       </p>
       
@@ -424,7 +561,13 @@ export default function RiskBasePage() {
           </button>
           <button
             className="px-8 py-3 bg-skyBlue hover:bg-[#4278FA]/80 dark:bg-bone dark:hover:bg-bone/80 text-white dark:text-black font-semibold rounded-lg shadow transition-colors duration-200 text-xl flex items-center justify-center gap-2"
-            onClick={() => window.location.href = "/matrices"}
+            onClick={async () => {
+              if (!checkAdminRole()) {
+                await show403Alert();
+                return;
+              }
+              window.location.href = "/matrices";
+            }}
             disabled={loading}
           >
             Actualizar política

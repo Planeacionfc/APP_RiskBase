@@ -1,6 +1,13 @@
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import ToggleTheme from "../theme/toggleTheme";
 import HomeIcon from "@/icons/homeIcon";
+import { jwtDecode } from 'jwt-decode';
+
+interface JwtPayload {
+  role?: string;
+  [key: string]: any;
+}
 
 export const Navbar = () => {
   // Función para cerrar sesión
@@ -11,6 +18,8 @@ export const Navbar = () => {
     }
   };
 
+  // Función para determinar usuario admin o regular
+  
   return (
     <section className="flex items-center w-full ">
       <nav className="w-full">

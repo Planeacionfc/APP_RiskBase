@@ -31,7 +31,6 @@ async def register_user(user: UserCreate = Body(...), current_user: User = Depen
         email=user.email,
         hashed_password=hashed_password,
         role=user.role,
-        is_active=True
     )
     db.add(db_user)
     db.commit()
@@ -44,7 +43,6 @@ async def register_user(user: UserCreate = Body(...), current_user: User = Depen
         role=db_user.role,
         is_active=db_user.is_active
     )
-
 
 @router.post("/login", response_model=Token)
 async def login_user(email: str = Body(...), password: str = Body(...)):
