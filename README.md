@@ -16,12 +16,12 @@ Desarrollar un aplicativo web sostenible y escalable que permita la gestión efi
 ### ⚙️ Funcionales
 - Gestión de usuarios y permisos.
 - Creación, actualización y eliminación de registros de riesgo.
-- Visualización dinámica de datos a través de gráficos y reportes.
-- Configuración de parámetros para la gestión de la base de riesgo.
+- Visualización dinámica de datos a través de tableros.
+- Configuración  y trazabilidad de los parámetros de la base de riesgo.
+- Almacenamiento de la información en la base de datos.
 
 ### 🛡️ No Funcionales
 - Seguridad en el acceso y protección de datos.
-- Rendimiento y escalabilidad del sistema.
 - Interfaz amigable y adaptable a distintos dispositivos.
 
 ## 📌 Criterios de Aceptación

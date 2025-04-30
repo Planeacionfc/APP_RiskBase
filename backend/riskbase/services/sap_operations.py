@@ -238,12 +238,8 @@ def get_data_sap():
     """
     Conecta a SAP y obtiene el stock del mes ANTERIOR al mes actual.
     """
-    # 1) Calcular el último día del mes anterior:
     today = datetime.now()
-    first_day_of_month = today.replace(day=1)
-    last_day_of_previous_month = first_day_of_month - timedelta(days=1)
-    # 2) Formatear como mm.YYYY
-    month = last_day_of_previous_month.strftime("%m.%Y")
+    month = today.strftime("%m.%Y")
 
     sap_conn = SAPConnection(
         ashost=os.getenv("ASHOST"),
