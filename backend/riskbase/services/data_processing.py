@@ -714,7 +714,7 @@ def process_dataframe_columns(df_final_combined: pd.DataFrame, df_matrices_merge
     # --- Realizar el merge para las filas con clave definida ---
     df_matrices_merge["concatenado"] = df_matrices_merge["concatenado"].astype(str).str.strip()
 
-    # Extraer la parte del df que tiene la clave (suponiendo que 'CLAVE' ya existe en df)
+    # Extraer la parte del df que tiene la clave
     df_subset = df.loc[~df["CLAVE"].isna()].copy()
     df_subset.reset_index(inplace=True)  # Guardamos el índice original
 

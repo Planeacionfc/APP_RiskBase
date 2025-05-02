@@ -39,7 +39,9 @@ export default function LoginPage() {
           position: "center",
           icon: "error",
           title: "Oops...",
-          text: "Usuario o contraseña incorrectos"
+          text: "Usuario o contraseña incorrectos",
+          showConfirmButton: true,
+          confirmButtonText: 'OK'
         });
         setLoading(false);
         return;
@@ -80,7 +82,9 @@ export default function LoginPage() {
       showAlert({
         icon: "error",
         title: "Oops...",
-        text: "Error de red o servidor"
+        text: "Error de red o servidor, por favor reinicia",
+        showConfirmButton: true,
+        confirmButtonText: 'OK'
       });
     } finally {
       setLoading(false);
@@ -110,7 +114,7 @@ export default function LoginPage() {
               onChange={e => setEmail(e.target.value)}
               required
               className="w-full px-5 py-3 bg-[#222a3a] border border-gray-400 rounded-lg text-[var(--color-cloud)] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-skyBlue)] shadow-[0_1.5px_8px_0_#2225] transition-all duration-200 text-base"
-              placeholder="example@example.com"
+              placeholder="ejemplo@prebel.com"
               autoComplete="username"
             />
           </div>
