@@ -1,52 +1,74 @@
-# 📌 APP_RiskBase - Aplicativo Web para la Gestión de la Base de Riesgo
+# 🚀 APP_RiskBase
 
-## 📖 Descripción General del Proyecto
-El aplicativo web tiene como finalidad optimizar la gestión de la base de riesgo, facilitando la extracción, almacenamiento, consulta, modificación y visualización de la información. Este sistema está diseñado para reducir la carga operativa y mejorar la eficiencia en la actualización y administración de datos.
+## 📋 Descripción general  
+APP_RiskBase es una aplicación web diseñada para facilitar la gestión, el análisis y la generación de informes de la base de riesgo de la organización. Integra datos desde SAP, aplica reglas de negocio para calcular factores provisionales y clasificaciones de riesgo, y ofrece interfaces diferenciadas para usuarios regulares y administradores, permitiendo procesamiento, visualización y actualización de políticas de la base de riesgo.
 
-## 🎯 Objetivo General y Alcance
-### 🎯 Objetivo General
-Desarrollar un aplicativo web sostenible y escalable que permita la gestión eficiente de la base de riesgo, garantizando la accesibilidad y actualización de la información en tiempo real.
+## 🎯 Objetivo general y alcance  
+- **Objetivo general**: Desarrollar un aplicativo web sostenible y escalable que permita la gestión eficiente de la base de riesgo, garantizando la accesibilidad, almacenamiento y actualización de la información en tiempo real.   
+- **Alcance**:  
+  - Reducir el proceso operativo para la generación del informe de la base de riesgo.  
+  - Facilitar la visualización de la información de manera estructurada e intuitiva.  
+  - Permitir la modificación eficiente de los parámetros de la política de la base de riesgo.  
+  - Almacenar la información procesada de la base de riesgo en una base de datos.  
+  - Generar trazabilidad de los cambios realizados a la política de la base de riesgo.
 
-### 🗂️ Alcance
-- Reducir el proceso operativo para la generación del informe de la base de riesgo.
-- Facilitar la visualización de la información de manera estructurada e intuitiva.
-- Permitir la modificación eficiente de los parámetros de la política de la base de riesgo.
+## 🛠️ Requisitos  
+### ✅ Funcionales  
+- Extracción de datos SAP.  
+- Transformación y ETL con pandas.  
+- Lógica de negocio para factor provisional y clasificación (Patrón Strategy).  
+- Autenticación JWT y autorización por roles.  
+- Generación de archivos Excel y almacenamiento temporal.  
+- Extracción, almacenamiento y actualización de datos.  
+- Creación de usuarios y asignación de roles. 
 
-## ✅ Requisitos Funcionales y No Funcionales
-### ⚙️ Funcionales
-- Gestión de usuarios y permisos.
-- Creación, actualización y eliminación de registros de riesgo.
-- Visualización dinámica de datos a través de tableros.
-- Configuración  y trazabilidad de los parámetros de la base de riesgo.
-- Almacenamiento de la información en la base de datos.
+### ⚠️ No funcionales  
+- Solo integración con SAP; no otros ERP.  
+- Sin análisis predictivo ni Machine Learning.  
+- Historial básico sin auditoría avanzada.  
+- Informes limitados a plantillas Excel predefinidas.
 
-### 🛡️ No Funcionales
-- Seguridad en el acceso y protección de datos.
-- Interfaz amigable y adaptable a distintos dispositivos.
+## ✔️ Criterios de aceptación  
+1. Modelo de base de datos funcional.  
+2. Creación de usuarios por roles (USER, ADMIN).  
+3. Procesamiento de datos aplicando reglas de negocio (Patrón Strategy).  
+4. Consulta y almacenamiento de datos.  
+5. Descarga de archivos Excel con información procesada.  
+6. Actualización y trazabilidad de la política de la base de riesgo.
 
-## 📌 Criterios de Aceptación
-- El sistema debe permitir la consulta y modificación de datos en tiempo real.
-- La plataforma debe garantizar un acceso seguro con autenticación y control de permisos.
-- La interfaz debe ser intuitiva y permitir la interacción fluida con los datos.
+## 🖥️ Entorno de desarrollo  
+### 🐍 Backend  
+- **Lenguaje**: Python 3.11.8  
+- **Frameworks**: FastAPI (0.115.12), Django (5.1.7)  
+- **ORM / DB**: SQLAlchemy, pyodbc (SQL Server)  
+- **SAP**: pyrfc (3.3.1), sap_library  
+- **Auth**: JWT (python‑jose v3.4.0), passlib v1.7.4  
+- **Librerías**: pandas v2.2.3, numpy v2.2.4, openpyxl v3.1.5, python‑dotenv v1.1.0, requests, cryptography, bcrypt…  
+- **Servidor**: Uvicorn  
+- **Dependencias**: requirements.txt :contentReference 
 
-## 🧑‍💻 Especificaciones del Entorno de Desarrollo
-- **Backend:** Python, Django, Django Rest Framework
-- **Base de Datos:** SQL Server
-- **Frontend:** React, Node.js
+### 💻 Frontend  
+- **Lenguaje**: TypeScript  
+- **Framework**: Next.js (15.2.2)  
+- **UI**: React (19.1.0), Material UI (7.0.2), @mui/x-data-grid (8.1.0), SweetAlert2 (11.19.1)  
+- **Estilos**: TailwindCSS (4.0.14), PostCSS (8.5.3)  
+- **Auth**: jwt‑decode (4.0.0)  
+- **Utilidades**: xlsx (0.18.5), next-themes (0.4.6)  
+- **Dependencias**: package.json, package-lock.json
 
-## 🚀 Instalación y Configuración
+## 📦 Instalación y Configuración
 
 Sigue estos pasos para instalar y configurar el proyecto **APP_RiskBase** (Backend y Frontend):
 
-### ⚙️ Backend
+### Backend
 
-1. 🌀 Clonar el repositorio
+1. Clonar el repositorio
 ```bash
 git clone https://github.com/Planeacionfc/APP_RiskBase.git
 cd APP_RiskBase/backend
 ```
 
-2. 🏗️ Crear y activar un entorno virtual (recomendado)
+2. Crear y activar un entorno virtual (recomendado)
 ```bash
 # En Windows
 python -m venv venv
@@ -57,96 +79,84 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-3. 📦 Instalar dependencias
+3. Instalar dependencias
 ```bash
 pip install -r requirements.txt
 ```
 
-4. 🔑 Configurar variables de entorno
+4. Configurar variables de entorno
 ```bash
 cp .env.example .env
 # Edita .env con tus credenciales de base de datos, SAP, API, etc.
 ```
 
-5. ▶️ Iniciar el backend
+5. Iniciar el backend
 ```bash
 python run.py
 ```
 El backend estará disponible en la URL y puerto configurados en tu archivo `.env` (por defecto http://127.0.0.1:8000).
 
-6. 📚 Acceder a la documentación interactiva
+6. Acceder a la documentación interactiva
 Abre tu navegador en:
 - [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 ---
 
-### 💻 Frontend
+### Frontend
 
-1. 📂 Ir a la carpeta del frontend
+1. Ir a la carpeta del frontend
 ```bash
 cd ../frontend
 ```
 
-2. 📦 Instalar dependencias
+2. Instalar dependencias
 ```bash
 npm install
 ```
 
-3. ▶️ Iniciar el frontend en modo desarrollo
+3. Iniciar el frontend en modo desarrollo
 ```bash
 npm run dev
 ```
 El frontend estará disponible por defecto en [http://localhost:3000](http://localhost:3000)
 
-> 💡 Si necesitas configurar variables de entorno, crea un archivo `.env` en la carpeta `frontend` y la carpeta `backend` con las variables necesarias. En el archivo `.env.example` puedes ver el ejemplo.
+> Si necesitas configurar variables de entorno, crea un archivo `.env` en la carpeta `frontend` y la carpeta `backend` con las variables necesarias. En el archivo `.env.example` puedes ver el ejemplo.
 
 ---
 
-## 📂 Código Fuente en GitHub
+## 🔗 Código Fuente en GitHub
 - Repositorio Backend: [https://github.com/Planeacionfc/APP_RiskBase/tree/master/backend](https://github.com/Planeacionfc/APP_RiskBase/tree/master/backend)
 - Repositorio Frontend: [https://github.com/Planeacionfc/APP_RiskBase/tree/master/frontend](https://github.com/Planeacionfc/APP_RiskBase/tree/master/frontend)
 
-## 🛠️ Plan de Soporte
-- 🔄 Revisiones periódicas para garantizar la estabilidad del sistema backend.
-- 🛡️ Mantenimiento preventivo y correctivo del código y dependencias.
-- ⬆️ Actualización de librerías y parches de seguridad.
-- 💬 Soporte técnico a usuarios y desarrolladores mediante canales definidos (correo, tickets, etc).
-- 📄 Documentación actualizada para facilitar la transferencia de conocimiento y onboarding de nuevos desarrolladores.
-
-## 📊 Monitorización y Logs
-- 📝 El backend implementa manejo global de errores y respuestas estructuradas para una mejor trazabilidad.
-- 📈 Se recomienda activar y centralizar logs usando herramientas como [Uvicorn logging], [Loguru], o integración con sistemas de monitoreo como ELK Stack (Elasticsearch, Logstash, Kibana) o Grafana Loki.
-- 🚦 Monitoreo de la salud del backend mediante endpoints de status y alertas automáticas ante caídas o errores críticos.
-- 🔍 Revisión periódica de los archivos de log y métricas de uso para detectar patrones anómalos o cuellos de botella.
-
-## 🔄 Estrategias de Mantenimiento y Actualizaciones
-- 💾 Realizar backups regulares de la base de datos y de los archivos de configuración.
-- 🧪 Probar las actualizaciones en un entorno de staging antes de desplegarlas en producción.
-- 🤖 Automatizar los despliegues y actualizaciones usando herramientas como Docker, CI/CD (GitHub Actions, GitLab CI, etc).
-- 🔒 Mantener actualizado el archivo `.env` y nunca exponerlo en repositorios públicos.
-- 📝 Documentar cada cambio relevante en el backend en el historial de versiones (changelog).
-- 🚦 Revisar y actualizar las políticas de CORS y seguridad conforme evolucionen los requisitos del frontend.
+## 🆘 Plan de Soporte
+- Diagnóstico y resolución: revisar logs (backend/dev_rfc.log, FastAPI/Django), consola del navegador (F12), Postman/curl para endpoints. 
+- Mantenimiento correctivo: corregir bugs en rama dev, actualizar dependencias (requirements.txt, package.json), ejecutar tests (pytest, npm test). 
+- Mantenimiento preventivo: revisión periódica de logs, backups de BD, actualización de docs y .env.example, auditorías de seguridad. 
+- Buenas prácticas: versionado por ramas, Pull Requests, documentación de commits, pruebas de regresión.
 
 ## 🔒 Plan de Seguridad Técnica
-- 🔑 Implementación de autenticación y control de accesos.
-- 🔐 Protección de datos sensibles mediante cifrado.
+- Autenticación & roles: JWT, validación en frontend y backend.
+- Permisos: endpoints críticos solo accesibles por ADMIN.
+- Variables sensibles: en .env, no versionadas.
+- Dependencias: revisión periódica (pip list --outdated, npm outdated).
+- Control de acceso: Pull Requests y revisiones de código.
+- Pruebas: roles y autenticación antes de despliegues.
 
 ## 🏛️ Arquitectura y Patrones
-- 🧩 Arquitectura basada en API REST.
-- 🏗️ Uso de patrones de diseño como MVC.
+- Arquitectura basada en API REST.
+- Uso de patrones de diseño como MVC.
+- Arquitectura en capas: separación clara entre presentación (frontend), lógica de negocio (servicios y dominio) y acceso a datos (base de datos y SAP).
+- Patrón Service Layer: la lógica de negocio principal se encuentra en servicios independientes reutilizables.
+- Patrón Repository: el acceso a datos y a SAP está desacoplado de la lógica de negocio mediante servicios o módulos dedicados.
+- Inyección de dependencias (Dependency Injection): uso de `Depends()` en FastAPI para la gestión de autenticación y permisos.
+- Validación y serialización: uso de modelos Pydantic (FastAPI) y Serializers (Django) para la validación y transformación de datos.
+- En el frontend, arquitectura basada en componentes reutilizables y hooks personalizados (Next.js/React).
+- Control de acceso basado en roles (RBAC): tanto en frontend como en backend se valida el rol del usuario para restringir funcionalidades críticas.
 
-## 👥 Descripción de Usuarios y Roles
+## 👤 Descripción de Usuarios y Roles
 - 👑 **Administrador:** Acceso total al sistema.
-- 👤 **Usuario Operativo:** Consulta de datos.
-
-## 📦 Plan de Despliegue e Instalación
-- 🚀 Despliegue en entornos de prueba y producción.
-- 📦 Uso de contenedores para facilitar la escalabilidad.
-
-## 🔐 Requisitos de Seguridad
-- 🛡️ Control de accesos mediante roles y permisos.
-- 📝 Registro de auditoría para seguimiento de cambios en la base de datos.
+- 👤 **Usuario Regular:** Consulta y descarga de datos.
 
 ---
 
-**Tecnologías utilizadas:** Python (backend), SQL Server (base de datos) y React (frontend).
+🛠️ **Tecnologías utilizadas:** Python (backend), SQL Server (base de datos) y React (frontend).
