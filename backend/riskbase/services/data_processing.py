@@ -745,36 +745,4 @@ def process_dataframe_columns(df_final_combined: pd.DataFrame, df_matrices_merge
     # 14. Calcular 'PROVISION'
     df["PROVISION"] = df.apply(calculate_provision_column, axis=1)
 
-    # Columnas en el orden deseado
-    columnas_ordenadas = [
-        "NEGOCIO INVENTARIOS", "AÑO NATURAL/MES","TIPO MATERIAL INVENTARIO", "MARCA DE QM", "MATERIAL", 
-        "DESCRIPCIÓN", "UNIDAD MEDIDA", "CENTRO", "CODIGO ALMACEN CLIENTE", "INDICADOR STOCK ESPEC.",
-        "NÚM.STOCK.ESP.", "LOTE", "CREADO EL", "FECH. FABRICACIÓN", "FECH, CADUCIDAD/FECH PREF. CONSUMO",
-        "FECHA BLOQUEADO", "FECHA OBSOLETO", "FECHA ENTRADA", "RANGO OBSOLETO 2", "RANGO COBERTURA",
-        "RANGO DE PERMANENCIA", "RANGO BLOQUEADO", "RANGO OBSOLETO", "RANGO VENCIDOS", "PRÓXIMO A VENCER",
-        "RANGO PRÓX.VENCER MM", "RANGO PRÓXIMOS A VEN", "TIPO DE MATERIAL (I)", "COSTO UNITARIO REAL",
-        "INVENTARIO DISPONIBL", "INVENTARIO NO DISPON", "VALOR OBSOLETO", "VALOR BLOQUEADO MM", "VALOR TOTAL MM", "PERMANENCIA",
-
-        "MARCA CONCAT", "SEGMENTACION", "SUBSEGMENTACION",  
-        "RANGO DE PERMANENCIA 2",
-        "STATUS CONS", "VALOR DEF", "RANGO OBSOLESCENCIA", "RANGO VENCIDO 2",
-        "RANGO BLOQUEADO 2", "RANGO CONS", "TIEMPO BLOQUEO", 
-        "FACTOR PROV", "CLAS BASE RIESGO", "BASE RIESGO", "PROVISION" 
-    ]
-
-    # Renombrar columnas duplicadas automáticamente
-    nuevos_nombres = []
-    conteo = {}
-    for col in df.columns:
-        if col in conteo:
-            conteo[col] += 1
-            nuevos_nombres.append(f"{col}_{conteo[col]}")
-        else:
-            conteo[col] = 0
-            nuevos_nombres.append(col)
-    df.columns = nuevos_nombres
-
-    # Reordenar las columnas
-    df = df.reindex(columns=columnas_ordenadas)
-    
     return df
