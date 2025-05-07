@@ -129,10 +129,6 @@ El frontend estará disponible por defecto en [http://localhost:3000](http://loc
 - Repositorio Backend: [https://github.com/Planeacionfc/APP_RiskBase/tree/master/backend](https://github.com/Planeacionfc/APP_RiskBase/tree/master/backend)
 - Repositorio Frontend: [https://github.com/Planeacionfc/APP_RiskBase/tree/master/frontend](https://github.com/Planeacionfc/APP_RiskBase/tree/master/frontend)
 
-## 👤 Descripción de Usuarios y Roles
-- 👑 **Administrador:** Acceso total al sistema.
-- 👤 **Usuario Regular:** Consulta y descarga de datos.
-
 ---
 
 🛠️ **Tecnologías utilizadas:** Python (backend), SQL Server (base de datos) y React (frontend).
