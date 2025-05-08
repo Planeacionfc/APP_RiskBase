@@ -131,5 +131,5 @@ El frontend estará disponible por defecto en [http://localhost:3000](http://loc
 
 ---
 
-📋 **Para información visita:** [![Doc DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Planeacionfc/APP_RiskBase)
+📋 **Para más información visita:**  [![Doc DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Planeacionfc/APP_RiskBase)
 
