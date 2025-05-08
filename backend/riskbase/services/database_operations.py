@@ -114,6 +114,69 @@ def df_matrices_merge():
     
     return df_matrices_merge
 
+def df_matrices_avon_natura():
+    """
+    Extrae los datos de ambas tablas, las unifica utilizando pd.merge(),
+    convierte todos los campos de texto a mayúsculas de forma vectorizada,
+    normaliza el factor provisional y, finalmente, filtra solo las filas
+    donde 'tipo_matriz' == 'MATRIZ NATURACO'.
+    """
+    # 1. Extraer los DataFrames base
+    df_inventario = get_inventario_matriz()
+    df_matrices   = get_matrices_base_riesgo()
+    
+    # 2. Unirlos por la clave foránea
+    df = pd.merge(
+        df_inventario,
+        df_matrices,
+        on="id_politica_base_riesgo",
+        how="inner"  # o 'left' / 'outer' según necesidad
+    )
+    
+    # 3. Pasar a mayúsculas todas las columnas de texto
+    text_cols = df.select_dtypes(include="object").columns
+    for c in text_cols:
+        df[c] = df[c].str.upper()
+    
+    # 4. Normalizar el factor provisional (de porcentaje a [0–1])
+    df["factor_prov"] = df["factor_prov"].astype(float) / 100.0
+    
+    # 5. Filtrar solo las filas de 'Matriz NaturaCo'
+    #    (ten en cuenta que ya convertimos todo a mayúsculas)
+    df = df[df["tipo_matriz"] == "MATRIZ NATURACO"].reset_index(drop=True)
+    
+    return df
+
+def df_matrices_otros_tipos():
+    """
+    Devuelve solo las filas de df_merge donde 'tipo_matriz' sea distinto de 'Matriz NaturaCo'.
+    Útil para aislar todas las demás matrices.
+    """
+    # 1. Extraer los DataFrames base
+    df_inventario = get_inventario_matriz()
+    df_matrices   = get_matrices_base_riesgo()
+    
+    # 2. Unirlos por la clave foránea
+    df = pd.merge(
+        df_inventario,
+        df_matrices,
+        on="id_politica_base_riesgo",
+        how="inner"  # o 'left' / 'outer' según necesidad
+    )
+    
+    # 3. Pasar a mayúsculas todas las columnas de texto
+    text_cols = df.select_dtypes(include="object").columns
+    for c in text_cols:
+        df[c] = df[c].str.upper()
+    
+    # 4. Normalizar el factor provisional (de porcentaje a [0–1])
+    df["factor_prov"] = df["factor_prov"].astype(float) / 100.0
+    
+    # Filtramos aquellas filas cuyo tipo de matriz NO sea 'MATRIZ NATURACO'
+    mask = df["tipo_matriz"] != "MATRIZ NATURACO"
+    
+    return df[mask].reset_index(drop=True)
+
 def upload_dataframe_to_db(df_final_combined: pd.DataFrame) -> None:
     """
     Sube el DataFrame 'df_final_combined' a la base de datos en la tabla 'InventarioBaseRiesgo'.
@@ -260,9 +323,9 @@ def get_inventory_by_month_year(mes: int, anio: int) -> pd.DataFrame:
             [CLAS BASE RIESGO],
             [BASE RIESGO],
             [PROVISION]
-          FROM InventarioBaseRiesgo
-         WHERE mes_registro = :mes
-           AND año_registro = :anio
+            FROM InventarioBaseRiesgo
+            WHERE mes_registro = :mes
+            AND año_registro = :anio
     """)
     with engine.connect() as conn:
         df = pd.read_sql(sql, conn, params={"mes": mes, "anio": anio})

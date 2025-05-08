@@ -522,227 +522,374 @@ def calculate_provision_column(row: pd.Series) -> float:
         return row["VALOR DEF"] * row['FACTOR PROV']
 
 
-def process_dataframe_columns(df_final_combined: pd.DataFrame, df_matrices_merge: pd.DataFrame) -> pd.DataFrame:
+def calculate_avon_natura_factor_and_class(row, lookup_dict):
+    """
+    Calcula factor provisional y clasificación solo para materiales de AVON y NATURA,
+    siguiendo la lógica de la fórmula de Excel proporcionada.
+    """
+    seg        = row["SEGMENTACION"]
+    status     = row["STATUS CONS"]
+    tiempo     = row["TIEMPO BLOQUEO"]
+    perm       = row["PERMANENCIA"]
+    tipo_mat   = row["TIPO DE MATERIAL (I)"]
+    negocio    = row["NEGOCIO INVENTARIOS"]
+    rango_cons = str(row["RANGO CONS"]).strip()
+    indic      = row["INDICADOR STOCK ESPEC."]
+
+    # 1) Segmento interno bloqueado poco tiempo
+    if seg in ["MARCAS PROPIAS", "EXPERTOS NO LOCALES", "DUEÑOS DE DEMANDA"] \
+       and status == "BLOQUEADO" and tiempo <= 30:
+        return 0.0, "BAJO"
+
+    # 2) Disponible o PAV y permanencia <= 30 en granel
+    if status in ["DISPONIBLE", "PAV"] \
+       and perm <= 30 \
+       and tipo_mat in ["GRANEL FAB A TERCERO", "GRANEL"]:
+        return 0.0, "BAJO"
+
+    # 3) Negocio FPT → lookup con A2&AQ2&AV2
+    if negocio == "FPT":
+        key = f"{negocio}{status}{rango_cons}"
+        return lookup_dict.get(key, (0.0, "BAJO"))
+
+    # 4) Stock ≠ W y obsoleto/bloqueado/vencido → mismo lookup
+    if indic != "W" and status in ["OBSOLETO", "BLOQUEADO", "VENCIDO"]:
+        key = f"{negocio}{status}{rango_cons}"
+        return lookup_dict.get(key, (0.0, "BAJO"))
+
+    # 5) Stock ≠ W y disponible → lookup con cobertura+permanencia2
+    if indic != "W" and status == "DISPONIBLE":
+        key = (
+            str(row["RANGO COBERTURA"]).strip()
+            + str(row["RANGO DE PERMANENCIA 2"]).strip()
+        )
+        return lookup_dict.get(key, (0.0, "BAJO"))
+
+    # 6) Marca Avon/Natura y estado vencido/obsoleto/PAV → primer dígito
+    marca_qm = row["MARCA DE QM"]
+    if marca_qm in ["AVON", "NATURA"] and status in ["VENCIDO", "OBSOLETO", "PAV"]:
+        try:
+            first_digit = int(rango_cons[0])
+            return (1.0, "MUY ALTO") if first_digit > 4 else (0.2, "MEDIO")
+        except:
+            return 0.0, "BAJO"
+
+    # Default
+    return 0.0, "BAJO"
+
+
+def calculate_otros_marcas_factor_and_class(row: pd.Series, lookup_dict: dict) -> tuple[float, str]:
+    """
+    Calcula factor provisional y clasificación para el resto de marcas
+    (excluyendo Avon/Natura), siguiendo la fórmula de Excel proporcionada.
+    """
+    seg         = row["SEGMENTACION"]
+    status      = row["STATUS CONS"]
+    tiempo      = row["TIEMPO BLOQUEO"]
+    indic       = row["INDICADOR STOCK ESPEC."]
+    perm        = row["PERMANENCIA"]
+    tipo_mat    = row["TIPO DE MATERIAL (I)"]
+    rango_cons  = str(row["RANGO CONS"]).strip()
+    cobertura   = str(row["RANGO COBERTURA"]).strip()
+    subseg      = str(row.get("SUBSEGMENTACION", "")).strip()
+    prox_vencer = str(row.get("RANGO PRÓX.VENCER MM", "")).strip()
+    negocio     = row["NEGOCIO INVENTARIOS"]
+
+    # 1) Dueños de canal / Marcas propias / Expertos no locales + Bloqueado corto → 0%, BAJO
+    if seg in ["DUEÑOS DE CANAL", "MARCAS PROPIAS", "EXPERTOS NO LOCALES"] \
+       and status == "BLOQUEADO" \
+       and tiempo <= 30:
+        return 0.0, "BAJO"
+
+    # 2) Indicador stock = "K" → 0%, BAJO
+    if indic == "K":
+        return 0.0, "BAJO"
+
+    # 3) Disponible/PAV + Granel y permanencia corta → 0%, BAJO
+    if status in ["DISPONIBLE", "PAV"] \
+       and tipo_mat in ["GRANEL", "GRANEL FAB A TERCERO"] \
+       and perm <= 30:
+        return 0.0, "BAJO"
+
+    # 4) Marca "OTRAS" o (Disponible + cobertura "") → 0%, BAJO
+    if row["MARCA DE QM"] == "OTRAS" \
+       or (status == "DISPONIBLE" and cobertura == ""):
+        return 0.0, "BAJO"
+
+    # 5) Stock = "W" → lookup según status
+    if indic == "W":
+        if status in ["VENCIDO", "PAV"]:
+            key = f"{seg}{status}{row['RANGO DE PERMANENCIA 2']}"
+        elif status == "DISPONIBLE":
+            key = f"{seg}{cobertura}{row['RANGO DE PERMANENCIA 2']}"
+        else:
+            key = f"{seg}{status}{rango_cons}"
+        return lookup_dict.get(key, (0.0, "BAJO"))
+
+    # 6) Stock = "SIN ASIGNAR" u "O"
+    if indic in ["SIN ASIGNAR", "O"]:
+        # a) PAV + próxima a vencer 3 o 4-6 meses
+        if status == "PAV" and prox_vencer in ["1.PAV 3 MESES", "2.PAV 4 A 6 MESES"]:
+            key = f"{seg}{subseg}{cobertura}{row['RANGO DE PERMANENCIA 2']}"
+            return lookup_dict.get(key, (0.0, "BAJO"))
+        # b) Disponible → lookup principal y fallback
+        if status == "DISPONIBLE":
+            key = f"{seg}{subseg}{cobertura}{row['RANGO DE PERMANENCIA 2']}"
+            if key in lookup_dict:
+                return lookup_dict[key]
+            alt = f"{seg}{subseg}{status} {rango_cons}"
+            return lookup_dict.get(alt, (0.0, "BAJO"))
+        # c) Obsoleto/Vencido/Bloqueado
+        if status in ["OBSOLETO", "VENCIDO", "BLOQUEADO"]:
+            key = f"{seg}{subseg}{status} {rango_cons}"
+            return lookup_dict.get(key, (0.0, "BAJO"))
+
+    # 7) Fallback por defecto → 0%, BAJO
+    return 0.0, "BAJO"
+
+
+def process_dataframe_avon_natura(df_avon_natura: pd.DataFrame,df_matrices_avon_natura: pd.DataFrame) -> pd.DataFrame:
     """
     Procesa el DataFrame aplicando todas las reglas de negocio en el orden específico requerido.
-    Se utilizan operaciones vectorizadas y merge para asignar 'FACTOR PROV' y 'CLAS BASE RIESGO'
-    mediante un sistema de estrategias (Strategy) de modo que se genere una columna auxiliar "CLAVE"
-    para las búsquedas en df_matrices_merge, y para las estrategias fijas se asignen directamente los valores.
-    La columna "CLAVE" se elimina antes de retornar el DataFrame final.
+
+    Args:
+        df: DataFrame con los datos de SAP
+
+    Returns:
+        pd.DataFrame: DataFrame procesado con todas las columnas calculadas
     """
-    df = df_final_combined.copy()
-    
-    # 1. Añadir columnas derivadas de 'MARCA DE QM'
-    df["MARCA CONCAT"] = df["MARCA DE QM"].apply(lambda x: insert_marks().get(x, ""))
-    df["SEGMENTACION"] = df["MARCA DE QM"].apply(lambda x: insert_segments().get(x, "OTRAS"))
-    df["SUBSEGMENTACION"] = df["MARCA DE QM"].apply(lambda x: insert_subsegmentacion().get(x, ""))
-    
+    # 1. Añadir columnas formuladas de 'MARCA CONCAT' y 'SEGMENTACION'
+    df_avon_natura["MARCA CONCAT"] = df_avon_natura["MARCA DE QM"].apply(lambda x: insert_marks().get(x, ""))
+    df_avon_natura["SEGMENTACION"] = df_avon_natura["MARCA DE QM"].apply(
+        lambda x: insert_segments().get(x, "OTRAS")
+    )
+    df_avon_natura["SUBSEGMENTACION"] = df_avon_natura["MARCA DE QM"].apply(
+        lambda x: insert_subsegmentacion().get(x, "")
+    )
+
     # 2. Calcular 'RANGO DE PERMANENCIA 2'
     required_columns = {"LOTE", "PERMANENCIA", "RANGO DE PERMANENCIA"}
-    if required_columns.issubset(df.columns):
-        df["RANGO DE PERMANENCIA 2"] = df.apply(calculate_rango_permanencia_column, axis=1)
+    if required_columns.issubset(df_avon_natura.columns):
+        df_avon_natura["RANGO DE PERMANENCIA 2"] = df_avon_natura.apply(calculate_rango_permanencia_column, axis=1)
     else:
-        print(f"Faltan columnas: {required_columns - set(df.columns)}")
-    
+        print(f"Faltan columnas: {required_columns - set(df_avon_natura.columns)}")
+
     # 3. Calcular 'STATUS CONS'
     required_columns = {"RANGO PRÓX.VENCER MM", "VALOR BLOQUEADO MM", "VALOR OBSOLETO"}
-    if required_columns.issubset(df.columns):
-        df["STATUS CONS"] = df.apply(calculate_status_cons_column, axis=1)
+    if required_columns.issubset(df_avon_natura.columns):
+        df_avon_natura["STATUS CONS"] = df_avon_natura.apply(calculate_status_cons_column, axis=1)
     else:
-        print(f"Faltan columnas: {required_columns - set(df.columns)}")
-    
+        print(f"Faltan columnas: {required_columns - set(df_avon_natura.columns)}")
+
     # 4. Calcular 'VALOR DEF'
     required_columns = {"STATUS CONS", "VALOR BLOQUEADO MM", "VALOR TOTAL MM"}
-    if required_columns.issubset(df.columns):
-        df["VALOR DEF"] = df.apply(calculate_valor_def_column, axis=1)
+    if required_columns.issubset(df_avon_natura.columns):
+        df_avon_natura["VALOR DEF"] = df_avon_natura.apply(calculate_valor_def_column, axis=1)
     else:
-        print(f"Faltan columnas: {required_columns - set(df.columns)}")
-    
+        print(f"Faltan columnas: {required_columns - set(df_avon_natura.columns)}")
+
     # 5. Reemplazar valores inválidos
-    df.replace("#", np.nan, inplace=True)
-    
+    df_avon_natura.replace("#", np.nan, inplace=True)
+
     # 6. Convertir columnas de fecha
     date_columns = [
-        "FECHA ENTRADA", "FECHA OBSOLETO", "FECHA BLOQUEADO",
-        "FECH. FABRICACIÓN", "CREADO EL", "FECH, CADUCIDAD/FECH PREF. CONSUMO"
+        "FECHA ENTRADA",
+        "FECHA OBSOLETO",
+        "FECHA BLOQUEADO",
+        "FECH. FABRICACIÓN",
+        "CREADO EL",
+        "FECH, CADUCIDAD/FECH PREF. CONSUMO",
     ]
+
     for col in date_columns:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], format="%d/%m/%Y", errors="coerce")
-    
+        if col in df_avon_natura.columns:
+            df_avon_natura[col] = pd.to_datetime(df_avon_natura[col], format="%d/%m/%Y", errors="coerce")
+
     # 7. Calcular 'RANGO OBSOLESCENCIA'
-    df["RANGO OBSOLESCENCIA"] = df.apply(calculate_rango_obsoleto_column, axis=1)
-    
+    df_avon_natura["RANGO OBSOLESCENCIA"] = df_avon_natura.apply(calculate_rango_obsoleto_column, axis=1)
+
     # 8. Calcular 'RANGO VENCIDO 2'
-    df["RANGO VENCIDO 2"] = df.apply(calculate_rango_vencido_column, axis=1)
-    
+    df_avon_natura["RANGO VENCIDO 2"] = df_avon_natura.apply(calculate_rango_vencido_column, axis=1)
+
     # 9. Calcular 'RANGO BLOQUEADO 2'
-    df["RANGO BLOQUEADO 2"] = df.apply(calculate_rango_bloqueado_column, axis=1)
-    
+    df_avon_natura["RANGO BLOQUEADO 2"] = df_avon_natura.apply(calculate_rango_bloqueado_column, axis=1)
+
     # 10. Calcular 'RANGO CONS'
-    df["RANGO CONS"] = df.apply(calculate_rango_cons_column, axis=1)
+    df_avon_natura["RANGO CONS"] = df_avon_natura.apply(calculate_rango_cons_column, axis=1)
     
     # 11. Calcular 'TIEMPO BLOQUEO'
-    df["TIEMPO BLOQUEO"] = df.apply(calculate_tiempo_bloqueo_column, axis=1)
-    
-    # 12. Calcular 'FACTOR PROV' y 'CLAS BASE RIESGO' usando estrategias vectorizadas con merge
-    # Se crea una columna auxiliar "CLAVE" que será asignada sólo para las filas que requieran lookup.
-    df["CLAVE"] = np.nan
-    df["FACTOR PROV"] = np.nan
-    df["CLAS BASE RIESGO"] = np.nan
+    df_avon_natura["TIEMPO BLOQUEO"] = df_avon_natura.apply(calculate_tiempo_bloqueo_column, axis=1)
 
-    df["CLAVE"] = df["CLAVE"].astype(object)
-    df["CLAS BASE RIESGO"] = df["CLAS BASE RIESGO"].astype(object)
+    # Construir lookup_dict **una vez** antes del apply
+    lookup_dict = {
+        str(r["concatenado"]).strip(): (r["factor_prov"], r["clasificacion"])
+        for _, r in df_matrices_avon_natura.iterrows()
+    }
 
-    # --- Estrategias fijas: se asignan valores directos y se deja "CLAVE" en NaN ---
-    # Fija 1: Si SEGMENTACION en ["DUEÑOS DE CANAL", "MARCAS PROPIAS", "EXPERTOS NO LOCALES"] y STATUS CONS=="BLOQUEADO" y TIEMPO BLOQUEO <=30
-    condition_fixed1 = (
-        df["SEGMENTACION"].str.upper().isin(["DUEÑOS DE CANAL", "MARCAS PROPIAS", "EXPERTOS NO LOCALES"]) &
-        (df["STATUS CONS"].str.upper() == "BLOQUEADO") &
-        (df["TIEMPO BLOQUEO"] <= 30)
+    # Aplicar fila a fila y asignar dos nuevas columnas
+    df_avon_natura[["FACTOR PROV", "CLAS BASE RIESGO"]] = df_avon_natura.apply(
+        lambda row: pd.Series(calculate_avon_natura_factor_and_class(row, lookup_dict)),
+        axis=1
     )
 
-    df.loc[condition_fixed1, "FACTOR PROV"] = 0.0
-    df.loc[condition_fixed1, "CLAS BASE RIESGO"] = "BAJO"
-    
-    # Fija 2: Si STATUS CONS in ["DISPONIBLE", "PAV"] y PERMANENCIA<=30 y TIPO DE MATERIAL (I) in ["GRANEL", "GRANEL FAB A TERCERO"]
-    condition_fixed2 = (
-        df["STATUS CONS"].isin(["DISPONIBLE", "PAV"]) &
-        (df["PERMANENCIA"] <= 30) &
-        df["TIPO DE MATERIAL (I)"].isin(["GRANEL", "GRANEL FAB A TERCERO"])
+    # 13. BASE RIESGO
+    df_avon_natura["BASE RIESGO"] = df_avon_natura.apply(
+        calculate_base_riesgo_column, axis=1
     )
-    df.loc[condition_fixed2, "FACTOR PROV"] = 0.0
-    df.loc[condition_fixed2, "CLAS BASE RIESGO"] = "BAJO"
-    
-    # Fija 3: Si INDICADOR STOCK ESPEC. es "K"
-    condition_fixed3 = (df["INDICADOR STOCK ESPEC."].str.upper() == "K")
-    df.loc[condition_fixed3, "FACTOR PROV"] = 0.0
-    df.loc[condition_fixed3, "CLAS BASE RIESGO"] = "BAJO"
-    
-    # Fija 4: Si MARCA CONCAT in ["AVON", "NATURA"] y STATUS CONS in ["VENCIDO", "OBSOLETO", "PAV"],
-    # se evalúa el primer dígito de RANGO CONS; si > 4 → (1.0, "MUY ALTO"), else → (0.2, "MEDIO")
-    condition_fixed4 = (
-        df["MARCA CONCAT"].str.upper().isin(["AVON", "NATURA"]) &
-        df["STATUS CONS"].str.upper().isin(["VENCIDO", "OBSOLETO", "PAV"])
+    # 14. PROVISION
+    df_avon_natura["PROVISION"] = df_avon_natura.apply(
+        calculate_provision_column, axis=1
     )
 
-    # Extraemos el primer carácter, convertimos a numérico y en caso de error se asigna NaN
-    df.loc[condition_fixed4, "TEMP_DIGIT"] = pd.to_numeric(
-        df.loc[condition_fixed4, "RANGO CONS"].astype(str).str.strip().str[0],
-        errors="coerce"
+    return df_avon_natura
+
+
+def process_dataframe_otras_marcas(df_otras_marcas: pd.DataFrame,df_matrices_otros_tipos: pd.DataFrame) -> pd.DataFrame:
+    """
+    Procesa el DataFrame aplicando todas las reglas de negocio en el orden específico requerido.
+
+    Args:
+        df: DataFrame con los datos de SAP
+
+    Returns:
+        pd.DataFrame: DataFrame procesado con todas las columnas calculadas
+    """
+    # 1. Añadir columnas formuladas de 'MARCA CONCAT' y 'SEGMENTACION'
+    df_otras_marcas["MARCA CONCAT"] = df_otras_marcas["MARCA DE QM"].apply(lambda x: insert_marks().get(x, ""))
+    df_otras_marcas["SEGMENTACION"] = df_otras_marcas["MARCA DE QM"].apply(
+        lambda x: insert_segments().get(x, "OTRAS")
+    )
+    df_otras_marcas["SUBSEGMENTACION"] = df_otras_marcas["MARCA DE QM"].apply(
+        lambda x: insert_subsegmentacion().get(x, "")
     )
 
-    condition_digit = df["TEMP_DIGIT"] > 4
+    # 2. Calcular 'RANGO DE PERMANENCIA 2'
+    required_columns = {"LOTE", "PERMANENCIA", "RANGO DE PERMANENCIA"}
+    if required_columns.issubset(df_otras_marcas.columns):
+        df_otras_marcas["RANGO DE PERMANENCIA 2"] = df_otras_marcas.apply(calculate_rango_permanencia_column, axis=1)
+    else:
+        print(f"Faltan columnas: {required_columns - set(df_otras_marcas.columns)}")
 
-    df.loc[condition_fixed4 & condition_digit, "FACTOR PROV"] = 1.0
-    df.loc[condition_fixed4 & condition_digit, "CLAS BASE RIESGO"] = "MUY ALTO"
-    df.loc[condition_fixed4 & (~condition_digit), "FACTOR PROV"] = 0.2
-    df.loc[condition_fixed4 & (~condition_digit), "CLAS BASE RIESGO"] = "MEDIO"
+    # 3. Calcular 'STATUS CONS'
+    required_columns = {"RANGO PRÓX.VENCER MM", "VALOR BLOQUEADO MM", "VALOR OBSOLETO"}
+    if required_columns.issubset(df_otras_marcas.columns):
+        df_otras_marcas["STATUS CONS"] = df_otras_marcas.apply(calculate_status_cons_column, axis=1)
+    else:
+        print(f"Faltan columnas: {required_columns - set(df_otras_marcas.columns)}")
 
-    # Eliminamos la columna temporal
-    df.drop(columns=["TEMP_DIGIT"], inplace=True)
-    
-    # Fija 5: Si MARCA DE QM is "OTRAS" o (STATUS CONS=="DISPONIBLE" y RANGO COBERTURA es vacío)
-    condition_fixed5 = (df["MARCA DE QM"].str.upper() == "OTRAS") | (
-        (df["STATUS CONS"].str.upper() == "DISPONIBLE") & (df["RANGO COBERTURA"].str.strip() == "")
-    )
-    df.loc[condition_fixed5, "FACTOR PROV"] = 0.0
-    df.loc[condition_fixed5, "CLAS BASE RIESGO"] = "BAJO"
-    
-    # --- Estrategias que requieren lookup: se asigna valor a "CLAVE" para las filas que aún no tienen valor fijo ---
-    condition_no_fixed = df["FACTOR PROV"].isna()
-    
-    # Lookup 1: Si NEGOCIO INVENTARIOS is "FPT"
-    mask_lookup1 = condition_no_fixed & (df["NEGOCIO INVENTARIOS"].str.upper() == "FPT")
-    df.loc[mask_lookup1, "CLAVE"] = (
-         df.loc[mask_lookup1, "NEGOCIO INVENTARIOS"].str.strip() +
-         df.loc[mask_lookup1, "STATUS CONS"].str.strip() +
-         df.loc[mask_lookup1, "RANGO CONS"].astype(str).str.strip()
-    )
-    
-    # Lookup 2: Si INDICADOR STOCK ESPEC. != "W" y STATUS CONS in ["OBSOLETO", "BLOQUEADO", "VENCIDO"]
-    mask_lookup2 = condition_no_fixed & (df["INDICADOR STOCK ESPEC."].str.upper() != "W") & (df["STATUS CONS"].isin(["OBSOLETO", "BLOQUEADO", "VENCIDO"]))
-    df.loc[mask_lookup2, "CLAVE"] = (
-         df.loc[mask_lookup2, "NEGOCIO INVENTARIOS"].str.strip() +
-         df.loc[mask_lookup2, "STATUS CONS"].str.strip() +
-         df.loc[mask_lookup2, "RANGO CONS"].astype(str).str.strip()
-    )
-    
-    # Lookup 3: Si INDICADOR STOCK ESPEC. == "W" y STATUS CONS in ["VENCIDO", "PAV"]
-    mask_lookup3 = condition_no_fixed & (df["INDICADOR STOCK ESPEC."].str.upper() == "W") & (df["STATUS CONS"].isin(["VENCIDO", "PAV"]))
-    df.loc[mask_lookup3, "CLAVE"] = (
-         df.loc[mask_lookup3, "SEGMENTACION"].str.strip() +
-         df.loc[mask_lookup3, "STATUS CONS"].str.strip() +
-         df.loc[mask_lookup3, "RANGO DE PERMANENCIA 2"].astype(str).str.strip()
-    )
-    
-    # Lookup 4: Si INDICADOR STOCK ESPEC. == "W" y STATUS CONS == "DISPONIBLE"
-    mask_lookup4 = condition_no_fixed & (df["INDICADOR STOCK ESPEC."].str.upper() == "W") & (df["STATUS CONS"].str.upper() == "DISPONIBLE")
-    df.loc[mask_lookup4, "CLAVE"] = (
-         df.loc[mask_lookup4, "SEGMENTACION"].str.strip() +
-         df.loc[mask_lookup4, "RANGO COBERTURA"].str.strip() +
-         df.loc[mask_lookup4, "RANGO DE PERMANENCIA 2"].astype(str).str.strip()
-    )
-    
-    # Lookup 5: Si INDICADOR STOCK ESPEC. in ["SIN ASIGNAR", "O"]
-    mask_lookup5 = condition_no_fixed & (df["INDICADOR STOCK ESPEC."].str.upper().isin(["SIN ASIGNAR", "O"]))
-    # Para STATUS CONS == "PAV" y RANGO PRÓX.VENCER MM in {"1.PAV 3 MESES", "2.PAV 4 A 6 MESES"}
-    mask_lookup5_pav = mask_lookup5 & (df["STATUS CONS"].str.upper() == "PAV") & (df["RANGO PRÓX.VENCER MM"].str.upper().isin(["1.PAV 3 MESES", "2.PAV 4 A 6 MESES"]))
-    df.loc[mask_lookup5_pav, "CLAVE"] = (
-         df.loc[mask_lookup5_pav, "SEGMENTACION"].str.strip() +
-         df.loc[mask_lookup5_pav, "SUBSEGMENTACION"].str.strip() +
-         df.loc[mask_lookup5_pav, "RANGO COBERTURA"].str.strip() +
-         df.loc[mask_lookup5_pav, "RANGO DE PERMANENCIA 2"].astype(str).str.strip()
-    )
-    # Para STATUS CONS == "DISPONIBLE": se asigna una primera CLAVE
-    mask_lookup5_disp = mask_lookup5 & (df["STATUS CONS"].str.upper() == "DISPONIBLE")
-    df.loc[mask_lookup5_disp, "CLAVE"] = (
-         df.loc[mask_lookup5_disp, "SEGMENTACION"].str.strip() +
-         df.loc[mask_lookup5_disp, "SUBSEGMENTACION"].str.strip() +
-         df.loc[mask_lookup5_disp, "RANGO COBERTURA"].str.strip() +
-         df.loc[mask_lookup5_disp, "RANGO DE PERMANENCIA 2"].astype(str).str.strip()
-    )
-    # Para STATUS CONS in ["OBSOLETO", "VENCIDO", "BLOQUEADO"]:
-    mask_lookup5_alt = mask_lookup5 & (df["STATUS CONS"].isin(["OBSOLETO", "VENCIDO", "BLOQUEADO"]))
-    df.loc[mask_lookup5_alt, "CLAVE"] = (
-         df.loc[mask_lookup5_alt, "SEGMENTACION"].str.strip() +
-         df.loc[mask_lookup5_alt, "SUBSEGMENTACION"].str.strip() +
-         df.loc[mask_lookup5_alt, "STATUS CONS"].str.strip() + " " +
-         df.loc[mask_lookup5_alt, "RANGO CONS"].astype(str).str.strip()
-    )
-    
-    # --- Realizar el merge para las filas con clave definida ---
-    df_matrices_merge["concatenado"] = df_matrices_merge["concatenado"].astype(str).str.strip()
+    # 4. Calcular 'VALOR DEF'
+    required_columns = {"STATUS CONS", "VALOR BLOQUEADO MM", "VALOR TOTAL MM"}
+    if required_columns.issubset(df_otras_marcas.columns):
+        df_otras_marcas["VALOR DEF"] = df_otras_marcas.apply(calculate_valor_def_column, axis=1)
+    else:
+        print(f"Faltan columnas: {required_columns - set(df_otras_marcas.columns)}")
 
-    # Extraer la parte del df que tiene la clave
-    df_subset = df.loc[~df["CLAVE"].isna()].copy()
-    df_subset.reset_index(inplace=True)  # Guardamos el índice original
+    # 5. Reemplazar valores inválidos
+    df_otras_marcas.replace("#", np.nan, inplace=True)
 
-    # Realizar el merge usando la columna 'concatenado' original de df_matrices_merge
-    merge_result = df_subset.merge(
-        df_matrices_merge[["concatenado", "factor_prov", "clasificacion"]],
-        left_on="CLAVE",
-        right_on="concatenado",
-        how="left"
+    # 6. Convertir columnas de fecha
+    date_columns = [
+        "FECHA ENTRADA",
+        "FECHA OBSOLETO",
+        "FECHA BLOQUEADO",
+        "FECH. FABRICACIÓN",
+        "CREADO EL",
+        "FECH, CADUCIDAD/FECH PREF. CONSUMO",
+    ]
+
+    for col in date_columns:
+        if col in df_otras_marcas.columns:
+            df_otras_marcas[col] = pd.to_datetime(df_otras_marcas[col], format="%d/%m/%Y", errors="coerce")
+
+    # 7. Calcular 'RANGO OBSOLESCENCIA'
+    df_otras_marcas["RANGO OBSOLESCENCIA"] = df_otras_marcas.apply(calculate_rango_obsoleto_column, axis=1)
+
+    # 8. Calcular 'RANGO VENCIDO 2'
+    df_otras_marcas["RANGO VENCIDO 2"] = df_otras_marcas.apply(calculate_rango_vencido_column, axis=1)
+
+    # 9. Calcular 'RANGO BLOQUEADO 2'
+    df_otras_marcas["RANGO BLOQUEADO 2"] = df_otras_marcas.apply(calculate_rango_bloqueado_column, axis=1)
+
+    # 10. Calcular 'RANGO CONS'
+    df_otras_marcas["RANGO CONS"] = df_otras_marcas.apply(calculate_rango_cons_column, axis=1)
+    
+    # 11. Calcular 'TIEMPO BLOQUEO'
+    df_otras_marcas["TIEMPO BLOQUEO"] = df_otras_marcas.apply(calculate_tiempo_bloqueo_column, axis=1)
+
+    # Construir lookup_dict **una vez** antes del apply
+    lookup_dict = {
+        str(r["concatenado"]).strip(): (r["factor_prov"], r["clasificacion"])
+        for _, r in df_matrices_otros_tipos.iterrows()
+    }
+
+    # Aplicar fila a fila y asignar dos nuevas columnas
+    df_otras_marcas[["FACTOR PROV", "CLAS BASE RIESGO"]] = df_otras_marcas.apply(
+        lambda row: pd.Series(calculate_otros_marcas_factor_and_class(row, lookup_dict)),
+        axis=1
     )
-    
-    # Asignar los valores del merge a las filas correspondientes usando el índice original
-    for _, mrow in merge_result.iterrows():
-        orig_idx = mrow["index"]
-        df.at[orig_idx, "FACTOR PROV"] = mrow["factor_prov"]
-        df.at[orig_idx, "CLAS BASE RIESGO"] = mrow["clasificacion"]
-    
-    # Para las filas sin CLAVE o sin coincidencia, asignar valores por defecto
-    df["FACTOR PROV"] = df["FACTOR PROV"].fillna(0.0)
-    df["CLAS BASE RIESGO"] = df["CLAS BASE RIESGO"].fillna("BAJO")
-    
-    # Eliminar la columna auxiliar "CLAVE"
-    df.drop(columns=["CLAVE"], inplace=True)
-    
+
     # 13. Calcular 'BASE RIESGO'
-    df["BASE RIESGO"] = df.apply(calculate_base_riesgo_column, axis=1)
+    df_otras_marcas["BASE RIESGO"] = df_otras_marcas.apply(calculate_base_riesgo_column, axis=1)
     
     # 14. Calcular 'PROVISION'
-    df["PROVISION"] = df.apply(calculate_provision_column, axis=1)
+    df_otras_marcas["PROVISION"] = df_otras_marcas.apply(calculate_provision_column, axis=1)
+    
+    return df_otras_marcas
 
-    return df
+
+def combine_final_dataframes(
+    df_final_avon_natura: pd.DataFrame,
+    df_final_otras_marcas: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Combina en un único DataFrame los resultados procesados para:
+      - Avon/Natura (df_final_avon_natura)
+      - Resto de marcas (df_final_otras_marcas)
+
+    Devuelve un nuevo DataFrame con todos los registros y reinicia el índice.
+    """
+    # Verificar que tengan las mismas columnas
+    cols1 = list(df_final_avon_natura.columns)
+    cols2 = list(df_final_otras_marcas.columns)
+    if cols1 != cols2:
+        raise ValueError(
+            "Los DataFrames no coinciden en sus columnas.\n"
+            f"Avon/Natura: {cols1}\n"
+            f"Otras marcas: {cols2}"
+        )
+
+    # Concatenar uno encima del otro
+    df_final_combined = pd.concat([df_final_avon_natura, df_final_otras_marcas], ignore_index=True)
+    
+    # Columnas en el orden deseado
+    columnas_ordenadas = [
+        "NEGOCIO INVENTARIOS", "AÑO NATURAL/MES","TIPO MATERIAL INVENTARIO", "MARCA DE QM", "MATERIAL", 
+        "DESCRIPCIÓN", "UNIDAD MEDIDA", "CENTRO", "CODIGO ALMACEN CLIENTE", "INDICADOR STOCK ESPEC.",
+        "NÚM.STOCK.ESP.", "LOTE", "CREADO EL", "FECH. FABRICACIÓN", "FECH, CADUCIDAD/FECH PREF. CONSUMO",
+        "FECHA BLOQUEADO", "FECHA OBSOLETO", "FECHA ENTRADA", "RANGO OBSOLETO 2", "RANGO COBERTURA",
+        "RANGO DE PERMANENCIA", "RANGO BLOQUEADO", "RANGO OBSOLETO", "RANGO VENCIDOS", "PRÓXIMO A VENCER",
+        "RANGO PRÓX.VENCER MM", "RANGO PRÓXIMOS A VEN", "TIPO DE MATERIAL (I)", "COSTO UNITARIO REAL",
+        "INVENTARIO DISPONIBL", "INVENTARIO NO DISPON", "VALOR OBSOLETO", "VALOR BLOQUEADO MM", "VALOR TOTAL MM", "PERMANENCIA",
+
+        "MARCA CONCAT", "SEGMENTACION", "SUBSEGMENTACION",  
+        "RANGO DE PERMANENCIA 2",
+        "STATUS CONS", "VALOR DEF", "RANGO OBSOLESCENCIA", "RANGO VENCIDO 2",
+        "RANGO BLOQUEADO 2", "RANGO CONS", "TIEMPO BLOQUEO", 
+        "FACTOR PROV", "CLAS BASE RIESGO", "BASE RIESGO", "PROVISION" 
+    ]
+    
+    # Renombrar columnas duplicadas automáticamente
+    nuevos_nombres = []
+    conteo = {}
+    for col in df_final_combined.columns:
+        if col in conteo:
+            conteo[col] += 1
+            nuevos_nombres.append(f"{col}_{conteo[col]}")
+        else:
+            conteo[col] = 0
+            nuevos_nombres.append(col)
+    df_final_combined.columns = nuevos_nombres
+    
+    df_final_combined = df_final_combined.reindex(columns=columnas_ordenadas)
+
+    return df_final_combined

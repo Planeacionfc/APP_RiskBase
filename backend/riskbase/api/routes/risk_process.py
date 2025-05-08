@@ -7,10 +7,16 @@ from ..dependencies import get_current_active_user, get_current_admin_user
 from ...services import (
     get_data_sap,
     df_matrices_merge,
+    df_matrices_avon_natura,
+    df_matrices_otros_tipos,
     df_matrices_merge_raw,
-    process_dataframe_columns,
+    filter_avon_natura,
+    filter_marca_otros,
     upload_dataframe_to_db,
-    get_inventory_by_month_year
+    get_inventory_by_month_year,
+    process_dataframe_avon_natura,
+    process_dataframe_otras_marcas,
+    combine_final_dataframes
 )
 import pandas as pd
 import numpy as np
@@ -34,15 +40,29 @@ async def process_riskbase(
     Solo accesible para administradores.
     """
     try:
-        matrices = df_matrices_merge()
+        matrices_avon_natura = df_matrices_avon_natura()
+        matrices_otros_tipos = df_matrices_otros_tipos()
+        
         df_sap = get_data_sap()
+
         if df_sap is None or df_sap.empty:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No se pudieron obtener datos de SAP"
             )
-        df_final_combined = process_dataframe_columns(df_sap, matrices)
-        excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+            
+        # 2. Filtro para obtener solo los datos de AVON y NATURA
+        df_avon_natura = filter_avon_natura(df_sap)
+        # 3. Filtro para obtener los datos de otras marcas
+        df_otras_marcas = filter_marca_otros(df_sap)
+        
+        df_final_avon_natura = process_dataframe_avon_natura(df_avon_natura, matrices_avon_natura)
+        
+        df_final_otras_marcas= process_dataframe_otras_marcas(df_otras_marcas, matrices_otros_tipos)
+        
+        df_final_combined = combine_final_dataframes(df_final_avon_natura, df_final_otras_marcas)
+        
+        excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d')}.xlsx"
         temp_dir = os.environ.get("TEMP_DIR")
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
@@ -76,16 +96,14 @@ async def consult_riskbase(
     Accesible para usuarios regulares y administradores.
     """
     try:
-        matrices = df_matrices_merge()
-        df_sap = get_inventory_by_month_year(mes, anio)
-        if df_sap is None or df_sap.empty:
+        df_final_combined = get_inventory_by_month_year(mes, anio)
+        if df_final_combined is None or df_final_combined.empty:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No se encontraron datos para mes={mes} y año={anio}"
             )
-        # Procesar los datos aplicando reglas de negocio
-        df_final_combined = process_dataframe_columns(df_sap, matrices)
-        excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+
+        excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d')}.xlsx"
         temp_dir = os.environ.get("TEMP_DIR")
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
@@ -112,7 +130,7 @@ async def consult_riskbase(
 @router.get("/data-view")
 async def get_risk_data(
     temp_file: Optional[str] = None,
-    limit: int = 20,
+    limit: int = 25,
     offset: int = 0,
     current_user = Depends(get_current_active_user)
 ):
@@ -190,9 +208,6 @@ async def export_to_excel(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al exportar a Excel: {str(e)}"
         )
-
-
-# --- ENDPOINTS SOLO PARA ADMINISTRADORES --- 
 
 # Modelo para recibir el nombre del archivo desde el body JSON
 class FileNameRequest(BaseModel):

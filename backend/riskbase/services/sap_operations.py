@@ -383,3 +383,30 @@ def get_data_sap():
     df_final_combined = pd.DataFrame(df_final_combined)
 
     return df_final_combined
+
+def filter_avon_natura(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Filtra un DataFrame para quedarse solo con los materiales
+    cuya 'MARCA DE QM' sea 'AVON' o 'NATURA'.
+
+    Args:
+        df (pd.DataFrame): DataFrame original que contiene la columna 'MARCA DE QM'.
+
+    Returns:
+        pd.DataFrame: Nuevo DataFrame con solo las filas de AVON y NATURA, reindexado de 0 a N-1.
+    """
+    mask = df["MARCA DE QM"].isin(["AVON", "NATURA"])
+    return df.loc[mask].reset_index(drop=True)
+
+def filter_marca_otros(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Devuelve solo las filas donde 'MARCA DE QM' NO sea ni 'AVON' ni 'NATURA'.
+    Esto permite trabajar con el resto de las marcas por separado.
+    """
+    # Aseguramos uniformidad en mayúsculas
+    df = df.copy()
+    df["MARCA DE QM"] = df["MARCA DE QM"].str.upper()
+    
+    # Filtramos inversamente
+    mask = ~df["MARCA DE QM"].isin(["AVON", "NATURA"])
+    return df[mask].reset_index(drop=True)
