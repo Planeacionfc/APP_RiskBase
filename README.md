@@ -132,3 +132,4 @@ El frontend estará disponible por defecto en [http://localhost:3000](http://loc
 ---
 
 🛠️ **Tecnologías utilizadas:** Python (backend), SQL Server (base de datos) y React (frontend).
+[![Doc DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Planeacionfc/APP_RiskBase)
