@@ -1,0 +1,20 @@
+
+**** Log file opened at 2025-04-03 08:29:42.070518 UTC-05:00 (Hora est. Pacífico, Sudamérica), Encoding UTF-8
+NW RFC Library: Kernel variant, Release 750 Patch Level 11
+Compilation date          : Jan 25 2023 01:21:13
+CPIC library              : 753.2022.12.23 version 3
+NI library                : 40
+Kernel Release            : 753 Patch Level 1116
+Current working directory : c:\Users\prac.planeacionfi\OneDrive - Prebel S.A BIC\Documentos\APP_RiskBase\backend\tests
+Program                   : python
+Process ID                : 21036
+User                      : prac.planeacionfi
+Hardware                  : PC with Windows NT 8x AMD64 Level 6 (Mod 140 Step 1)
+Operating_system          : Windows NT 10.0
+Hostname                  : RCP-PRACPLAFIN
+IP address                : 172.15.2.88
+IPv6 address              : fe80::289a:100b:470f:4c05
+Global trace level        : 0
+
+2025-04-03 08:29:42.063246 [10096] >> Info entry
+	Did not find config file c:\Users\prac.planeacionfi\OneDrive - Prebel S.A BIC\Documentos\APP_RiskBase\backend\tests\sapnwrfc.ini.
