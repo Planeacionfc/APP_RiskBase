@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from datetime import datetime
 import os
 from sqlalchemy import create_engine
@@ -689,7 +689,7 @@ def calculate_avon_natura_factor_and_class(row: pd.Series, lookup_dict: dict) ->
     """
     seg        = row["SEGMENTACION"]
     status     = row["STATUS CONS"]
-    tiempo     = row["TIEMPO BLOQUEO"]
+    tiempo     = row["TIEMPO BLOQUEADO"]
     perm       = row["PERMANENCIA"]
     tipo_mat   = row["TIPO DE MATERIAL (I)"]
     negocio    = row["NEGOCIO INVENTARIOS"]
@@ -738,41 +738,38 @@ def calculate_avon_natura_factor_and_class(row: pd.Series, lookup_dict: dict) ->
     return 0.0, "BAJO"
 
 
-def calculate_otros_marcas_factor_and_class(row: pd.Series, lookup_dict: dict) -> tuple[float, str]:
+def lookup_dict_by_tipo(
+    tipo_busqueda: str,
+    lookup_dict: Dict[str, Tuple[float, str]]
+) -> Tuple[float, str]:
     """
-    Calcula factor provisional y clasificación para el resto de marcas (excluyendo Avon/Natura).
-    
-    Esta función aplica reglas específicas para determinar el factor de provisión
-    y la clasificación de riesgo para los productos de marcas diferentes a AVON y NATURA,
-    siguiendo una lógica de negocio predefinida basada en múltiples criterios como
-    segmentación, estado, tiempo de bloqueo, entre otros.
-    
-    Args:
-        row: Fila del DataFrame con múltiples columnas necesarias para el cálculo
-        lookup_dict: Diccionario de búsqueda con valores predefinidos para factores
-                    y clasificaciones según combinaciones específicas de criterios
-    
-    Returns:
-        tuple[float, str]: Una tupla que contiene:
-                          - float: Factor de provisión (entre 0.0 y 1.0)
-                          - str: Clasificación de riesgo ('BAJO', 'MEDIO', 'MUY ALTO', etc.)
+    Busca en el lookup_dict la primera fila cuya 'tipo_matriz' coincide con tipo_busqueda.
+    El lookup_dict deberá mapear también tipo_matriz → (factor, clasif).
     """
-    seg         = row["SEGMENTACION"]
-    status      = row["STATUS CONS"]
-    tiempo      = row["TIEMPO BLOQUEO"]
-    indic       = row["INDICADOR STOCK ESPEC."]
-    perm        = row["PERMANENCIA"]
+    return lookup_dict.get(tipo_busqueda, (0.0, "BAJO"))
+
+
+def calculate_otros_marcas_factor_and_class(
+    row: pd.Series,
+    df_matrices_otros_tipos: pd.DataFrame
+) -> Tuple[float, str]:
+    
+    # Extraer campos
+    seg         = row["SEGMENTACION"].strip()
+    subseg      = row.get("SUBSEGMENTACION", "").strip()
+    status      = row["STATUS CONS"].strip()
+    tiempo      = row["TIEMPO BLOQUEADO"]
+    indic       = row["INDICADOR STOCK ESPEC."].strip()
     tipo_mat    = row["TIPO DE MATERIAL (I)"]
+    perm        = row["PERMANENCIA"]
     rango_cons  = str(row["RANGO CONS"]).strip()
     cobertura   = str(row["RANGO COBERTURA"]).strip()
-    subseg      = str(row.get("SUBSEGMENTACION", "")).strip()
     prox_vencer = str(row.get("RANGO PRÓX.VENCER MM", "")).strip()
-    negocio     = row["NEGOCIO INVENTARIOS"]
 
     # 1) Dueños de canal / Marcas propias / Expertos no locales + Bloqueado corto → 0%, BAJO
     if seg in ["DUEÑOS DE CANAL", "MARCAS PROPIAS", "EXPERTOS NO LOCALES"] \
-       and status == "BLOQUEADO" \
-       and tiempo <= 30:
+        and status == "BLOQUEADO" \
+        and tiempo <= 30:                             
         return 0.0, "BAJO"
 
     # 2) Indicador stock = "K" → 0%, BAJO
@@ -781,42 +778,89 @@ def calculate_otros_marcas_factor_and_class(row: pd.Series, lookup_dict: dict) -
 
     # 3) Disponible/PAV + Granel y permanencia corta → 0%, BAJO
     if status in ["DISPONIBLE", "PAV"] \
-       and tipo_mat in ["GRANEL", "GRANEL FAB A TERCERO"] \
-       and perm <= 30:
+        and tipo_mat in ["GRANEL", "GRANEL FAB A TERCERO"] \
+        and perm <= 30:
         return 0.0, "BAJO"
 
-    # 4) Marca "OTRAS" o (Disponible + cobertura "") → 0%, BAJO
+    # 4) Marca "OTRAS" o (Disponible + cobertura vacía) → 0%, BAJO
     if row["MARCA DE QM"] == "OTRAS" \
-       or (status == "DISPONIBLE" and cobertura == ""):
+        or (status == "DISPONIBLE" and cobertura == ""):
         return 0.0, "BAJO"
 
-    # 5) Stock = "W" → lookup según status
+    # 5) STOCK = "W" → lookup por tipo de matriz específico
     if indic == "W":
         if status in ["VENCIDO", "PAV"]:
-            key = f"{seg}{status}{row['RANGO DE PERMANENCIA 2']}"
+            clave = seg + status + rango_cons
+            tipo_busqueda = 'PVA Y VENCIDOS'
         elif status == "DISPONIBLE":
-            key = f"{seg}{cobertura}{row['RANGO DE PERMANENCIA 2']}"
+            clave = seg + cobertura + row["RANGO DE PERMANENCIA 2"]
+            tipo_busqueda = 'MATRIZ DISPONIBLES VMI'
         else:
-            key = f"{seg}{status}{rango_cons}"
-        return lookup_dict.get(key, (0.0, "BAJO"))
+            clave = seg + status + rango_cons
+            tipo_busqueda = 'OBSOLETO'
+            
+        mat = df_matrices_otros_tipos.loc[
+            (df_matrices_otros_tipos["tipo_matriz"] == tipo_busqueda) &
+            (df_matrices_otros_tipos["concatenado"].str.strip() == clave)
+        ]
+        
+        if not mat.empty:
+            return float(mat.iloc[0]["factor_prov"]), mat.iloc[0]["clasificacion"]
+        return 0.0, "BAJO"
 
-    # 6) Stock = "SIN ASIGNAR" u "O"
-    if indic in ["SIN ASIGNAR", "O"]:
-        # a) PAV + próxima a vencer 3 o 4-6 meses
-        if status == "PAV" and prox_vencer in ["1.PAV 3 MESES", "2.PAV 4 A 6 MESES"]:
-            key = f"{seg}{subseg}{cobertura}{row['RANGO DE PERMANENCIA 2']}"
-            return lookup_dict.get(key, (0.0, "BAJO"))
-        # b) Disponible → lookup principal y fallback
+    # 6) STOCK = "SIN ASIGNAR" u "O" → múltiples BUSCARV con fallback
+    if indic in ["SIN ASIGNAR","O"]:
+        # a) PAV + 1.PAV 3 MESES → BUSCARV(AP2&AQ2&W2&AR2; N:R; 4; 0)
+        if status=="PAV" and prox_vencer=="1.PAV 3 MESES":
+            clave = seg + subseg + cobertura + row["RANGO DE PERMANENCIA 2"]
+            tipo  = "PVA 1 A 3 MESES"
+            mat = df_matrices_otros_tipos.loc[
+                (df_matrices_otros_tipos["tipo_matriz"] == tipo) &
+                (df_matrices_otros_tipos["concatenado"].str.strip() == clave)
+            ]
+            if not mat.empty:
+                return float(mat.iloc[0]["factor_prov"]), mat.iloc[0]["clasificacion"]
+            
+        # b) PAV + 2.PAV 4 A 6 MESES → BUSCARV(AP2&AQ2&W2&AR2; T:X; 4; 0)
+        if status=="PAV" and prox_vencer=="2.PAV 4 A 6 MESES":
+            clave = seg + subseg + cobertura + row["RANGO DE PERMANENCIA 2"]
+            tipo  = "PVA 4 A 6 MESES"
+            mat = df_matrices_otros_tipos.loc[
+                (df_matrices_otros_tipos["tipo_matriz"] == tipo) &
+                (df_matrices_otros_tipos["concatenado"].str.strip() == clave)
+            ]
+            if not mat.empty:
+                return float(mat.iloc[0]["factor_prov"]), mat.iloc[0]["clasificacion"]
+
+        # c) Disponible → primer BUSCARV(AP2&AQ2&W2&AR2; H:L), si falla BUSCARV($AP2&$AQ2&$AS2&" "&$AX2; B:F)
         if status == "DISPONIBLE":
-            key = f"{seg}{subseg}{cobertura}{row['RANGO DE PERMANENCIA 2']}"
-            if key in lookup_dict:
-                return lookup_dict[key]
-            alt = f"{seg}{subseg}{status} {rango_cons}"
-            return lookup_dict.get(alt, (0.0, "BAJO"))
-        # c) Obsoleto/Vencido/Bloqueado
-        if status in ["OBSOLETO", "VENCIDO", "BLOQUEADO"]:
-            key = f"{seg}{subseg}{status} {rango_cons}"
-            return lookup_dict.get(key, (0.0, "BAJO"))
+            # 1er intento sobre H:L
+            clave1 = seg + subseg + cobertura + row["RANGO DE PERMANENCIA 2"]
+            mat1 = df_matrices_otros_tipos.loc[
+                (df_matrices_otros_tipos["tipo_matriz"] == "DISPONIBLE") &
+                (df_matrices_otros_tipos["concatenado"].str.strip() == clave1)
+            ]
+            if not mat1.empty:
+                return float(mat1.iloc[0]["factor_prov"]), mat1.iloc[0]["clasificacion"]
+            # fallback sobre B:F (note el espacio antes de rango_cons)
+            clave2 = seg + subseg + status + " " + rango_cons
+            mat2 = df_matrices_otros_tipos.loc[
+                (df_matrices_otros_tipos["tipo_matriz"] == "OBSOLETOS, BLOQUEADOS, VENCIDOS") &
+                (df_matrices_otros_tipos["concatenado"].str.strip() == clave2)
+            ]
+            if not mat2.empty:
+                return float(mat2.iloc[0]["factor_prov"]), mat2.iloc[0]["clasificacion"]
+            return 0.0, "BAJO"
+
+        # d) Obsoleto/Vencido/Bloqueado → BUSCARV($AP2&$AQ2&$AS2&" "&$AX2; B:F;4;0)
+        if status in ["OBSOLETO","VENCIDO","BLOQUEADO"]:
+            clave = seg + subseg + status + " " + rango_cons
+            mat = df_matrices_otros_tipos.loc[
+                (df_matrices_otros_tipos["tipo_matriz"] == "OBSOLETOS, BLOQUEADOS, VENCIDOS") &
+                (df_matrices_otros_tipos["concatenado"].str.strip() == clave)
+            ]
+            if not mat.empty:
+                return float(mat.iloc[0]["factor_prov"]), mat.iloc[0]["clasificacion"]
 
     # 7) Fallback por defecto → 0%, BAJO
     return 0.0, "BAJO"
@@ -901,7 +945,7 @@ def process_dataframe_avon_natura(df_avon_natura: pd.DataFrame, df_matrices_avon
     df_avon_natura["RANGO CONS"] = df_avon_natura.apply(calculate_rango_cons_column, axis=1)
     
     # 11. Calcular 'TIEMPO BLOQUEO'
-    df_avon_natura["TIEMPO BLOQUEO"] = df_avon_natura.apply(calculate_tiempo_bloqueo_column, axis=1)
+    df_avon_natura["TIEMPO BLOQUEADO"] = df_avon_natura.apply(calculate_tiempo_bloqueo_column, axis=1)
 
     # Construir lookup_dict **una vez** antes del apply
     lookup_dict = {
@@ -927,25 +971,17 @@ def process_dataframe_avon_natura(df_avon_natura: pd.DataFrame, df_matrices_avon
     return df_avon_natura
 
 
-def process_dataframe_otras_marcas(df_otras_marcas: pd.DataFrame, df_matrices_otros_tipos: pd.DataFrame) -> pd.DataFrame:
+def process_dataframe_otras_marcas(df_otras_marcas: pd.DataFrame,df_matrices_otros_tipos: pd.DataFrame) -> pd.DataFrame:
     """
-    Procesa el DataFrame de otras marcas aplicando todas las reglas de negocio en orden.
-    
-    Esta función realiza el procesamiento completo de los datos de inventario para marcas
-    diferentes a AVON y NATURA, aplicando secuencialmente todas las transformaciones y
-    cálculos necesarios para el análisis de riesgo, incluyendo mapeos, cálculos de rangos,
-    estados, valores y provisiones.
-    
+    Procesa el DataFrame aplicando todas las reglas de negocio en el orden específico requerido.
+
     Args:
-        df_otras_marcas: DataFrame con los datos de inventario de marcas diferentes a AVON y NATURA
-        df_matrices_otros_tipos: DataFrame con las matrices de referencia para el cálculo
-                                de factores de provisión y clasificaciones
-    
+        df: DataFrame con los datos de SAP
+
     Returns:
-        pd.DataFrame: DataFrame procesado con todas las columnas calculadas, incluyendo
-                     marcas concatenadas, segmentaciones, rangos, estados, valores,
-                     factores de provisión, clasificaciones y montos de provisión.
+        pd.DataFrame: DataFrame procesado con todas las columnas calculadas
     """
+    
     # 1. Añadir columnas formuladas de 'MARCA CONCAT' y 'SEGMENTACION'
     df_otras_marcas["MARCA CONCAT"] = df_otras_marcas["MARCA DE QM"].apply(lambda x: insert_marks().get(x, ""))
     df_otras_marcas["SEGMENTACION"] = df_otras_marcas["MARCA DE QM"].apply(
@@ -1006,17 +1042,13 @@ def process_dataframe_otras_marcas(df_otras_marcas: pd.DataFrame, df_matrices_ot
     df_otras_marcas["RANGO CONS"] = df_otras_marcas.apply(calculate_rango_cons_column, axis=1)
     
     # 11. Calcular 'TIEMPO BLOQUEO'
-    df_otras_marcas["TIEMPO BLOQUEO"] = df_otras_marcas.apply(calculate_tiempo_bloqueo_column, axis=1)
+    df_otras_marcas["TIEMPO BLOQUEADO"] = df_otras_marcas.apply(calculate_tiempo_bloqueo_column, axis=1)
 
-    # Construir lookup_dict **una vez** antes del apply
-    lookup_dict = {
-        str(r["concatenado"]).strip(): (r["factor_prov"], r["clasificacion"])
-        for _, r in df_matrices_otros_tipos.iterrows()
-    }
-
-    # Aplicar fila a fila y asignar dos nuevas columnas
+    # 12. Aplicar cálculo fila a fila, pasando el DataFrame de matrices:
     df_otras_marcas[["FACTOR PROV", "CLAS BASE RIESGO"]] = df_otras_marcas.apply(
-        lambda row: pd.Series(calculate_otros_marcas_factor_and_class(row, lookup_dict)),
+        lambda r: pd.Series(
+            calculate_otros_marcas_factor_and_class(r, df_matrices_otros_tipos)
+        ),
         axis=1
     )
 
@@ -1034,25 +1066,11 @@ def combine_final_dataframes(
     df_final_otras_marcas: pd.DataFrame
 ) -> pd.DataFrame:
     """
-    Combina en un único DataFrame los resultados procesados de AVON/NATURA y otras marcas.
-    
-    Esta función une los DataFrames procesados de AVON/NATURA y otras marcas en un
-    único DataFrame consolidado, verificando la compatibilidad de columnas, ordenando
-    las columnas según un orden predefinido y manejando posibles duplicados en nombres
-    de columnas.
-    
-    Args:
-        df_final_avon_natura: DataFrame procesado con los datos de AVON y NATURA
-        df_final_otras_marcas: DataFrame procesado con los datos de otras marcas
-    
-    Returns:
-        pd.DataFrame: DataFrame combinado con todos los registros de ambos DataFrames,
-                     con índice reiniciado y columnas ordenadas según el orden predefinido.
-                     Si hay columnas duplicadas, se renombran automáticamente.
-    
-    Raises:
-        ValueError: Si los DataFrames no tienen las mismas columnas, lo que indicaría
-                  incompatibilidad para la combinación.
+    Combina en un único DataFrame los resultados procesados para:
+      - Avon/Natura (df_final_avon_natura)
+      - Resto de marcas (df_final_otras_marcas)
+
+    Devuelve un nuevo DataFrame con todos los registros y reinicia el índice.
     """
     # Verificar que tengan las mismas columnas
     cols1 = list(df_final_avon_natura.columns)
@@ -1065,7 +1083,7 @@ def combine_final_dataframes(
         )
 
     # Concatenar uno encima del otro
-    df_final_combined = pd.concat([df_final_avon_natura, df_final_otras_marcas], ignore_index=True)
+    df_final_merge = pd.concat([df_final_avon_natura, df_final_otras_marcas], ignore_index=True)
     
     # Columnas en el orden deseado
     columnas_ordenadas = [
@@ -1077,25 +1095,25 @@ def combine_final_dataframes(
         "RANGO PRÓX.VENCER MM", "RANGO PRÓXIMOS A VEN", "TIPO DE MATERIAL (I)", "COSTO UNITARIO REAL",
         "INVENTARIO DISPONIBL", "INVENTARIO NO DISPON", "VALOR OBSOLETO", "VALOR BLOQUEADO MM", "VALOR TOTAL MM", "PERMANENCIA",
 
-        "MARCA CONCAT", "SEGMENTACION", "SUBSEGMENTACION",  
+        "TIEMPO BLOQUEADO","MARCA CONCAT", "SEGMENTACION", "SUBSEGMENTACION",  
         "RANGO DE PERMANENCIA 2",
         "STATUS CONS", "VALOR DEF", "RANGO OBSOLESCENCIA", "RANGO VENCIDO 2",
-        "RANGO BLOQUEADO 2", "RANGO CONS", "TIEMPO BLOQUEO", 
+        "RANGO BLOQUEADO 2", "RANGO CONS",  
         "FACTOR PROV", "CLAS BASE RIESGO", "BASE RIESGO", "PROVISION" 
     ]
     
     # Renombrar columnas duplicadas automáticamente
     nuevos_nombres = []
     conteo = {}
-    for col in df_final_combined.columns:
+    for col in df_final_merge.columns:
         if col in conteo:
             conteo[col] += 1
             nuevos_nombres.append(f"{col}_{conteo[col]}")
         else:
             conteo[col] = 0
             nuevos_nombres.append(col)
-    df_final_combined.columns = nuevos_nombres
+    df_final_merge.columns = nuevos_nombres
     
-    df_final_combined = df_final_combined.reindex(columns=columnas_ordenadas)
+    df_final_merge = df_final_merge.reindex(columns=columnas_ordenadas)
 
-    return df_final_combined
+    return df_final_merge
