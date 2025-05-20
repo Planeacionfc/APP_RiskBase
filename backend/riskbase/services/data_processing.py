@@ -5,6 +5,10 @@ from datetime import datetime
 import os
 from sqlalchemy import create_engine
 
+# ----------------------------------------------#
+#           FUNCIONES DE MAPEO DE MARCAS        #
+# ----------------------------------------------#
+
 def insert_marks() -> Dict[str, str]:
     """
     Retorna un diccionario con el mapeo de marcas QM a marcas concatenadas.
@@ -323,6 +327,11 @@ def insert_segments() -> Dict[str, str]:
         "CATÁLOGO DE PRODUCTOS": "NO APLICA",
     }
 
+
+
+# ----------------------------------------------#
+#        FUNCIONES DE COLUMNAS FORMULADAS       #
+# ----------------------------------------------#
 
 def calculate_rango_permanencia_column(row: pd.Series) -> str:
     """
@@ -669,7 +678,14 @@ def calculate_provision_column(row: pd.Series) -> float:
         return row["VALOR DEF"] * row['FACTOR PROV']
 
 
-def calculate_avon_natura_factor_and_class(row: pd.Series, lookup_dict: dict) -> tuple[float, str]:
+
+# ----------------------------------------------#
+#        LOGICA DE NEGOCIO PARA AVON Y NATURA   #
+# ----------------------------------------------#
+def calculate_avon_natura_factor_and_class(
+    row: pd.Series,
+    lookup_dict: dict
+) -> tuple[float, str]:
     """
     Calcula factor provisional y clasificación solo para materiales de AVON y NATURA.
     
@@ -737,6 +753,11 @@ def calculate_avon_natura_factor_and_class(row: pd.Series, lookup_dict: dict) ->
     # Default
     return 0.0, "BAJO"
 
+
+
+# ----------------------------------------------#
+#        LOGICA DE NEGOCIO PARA OTRAS MARCAS    #
+# ----------------------------------------------#
 
 def lookup_dict_by_tipo(
     tipo_busqueda: str,
@@ -866,7 +887,15 @@ def calculate_otros_marcas_factor_and_class(
     return 0.0, "BAJO"
 
 
-def process_dataframe_avon_natura(df_avon_natura: pd.DataFrame, df_matrices_avon_natura: pd.DataFrame) -> pd.DataFrame:
+
+# ----------------------------------------------#
+#        FUNCIONES DE PROCESAMIENTO DE DATOS    #
+# ----------------------------------------------#
+
+def process_dataframe_avon_natura(
+    df_avon_natura: pd.DataFrame,
+    df_matrices_avon_natura: pd.DataFrame
+) -> pd.DataFrame:
     """
     Procesa el DataFrame de AVON y NATURA aplicando todas las reglas de negocio en orden.
     
@@ -971,7 +1000,10 @@ def process_dataframe_avon_natura(df_avon_natura: pd.DataFrame, df_matrices_avon
     return df_avon_natura
 
 
-def process_dataframe_otras_marcas(df_otras_marcas: pd.DataFrame,df_matrices_otros_tipos: pd.DataFrame) -> pd.DataFrame:
+def process_dataframe_otras_marcas(
+    df_otras_marcas: pd.DataFrame,
+    df_matrices_otros_tipos: pd.DataFrame
+) -> pd.DataFrame:
     """
     Procesa el DataFrame aplicando todas las reglas de negocio en el orden específico requerido.
 
@@ -1060,6 +1092,11 @@ def process_dataframe_otras_marcas(df_otras_marcas: pd.DataFrame,df_matrices_otr
     
     return df_otras_marcas
 
+
+
+# ----------------------------------------------#
+#        FUNCION PARA UNIR LOS DATAFRAMES       #
+# ----------------------------------------------#
 
 def combine_final_dataframes(
     df_final_avon_natura: pd.DataFrame,

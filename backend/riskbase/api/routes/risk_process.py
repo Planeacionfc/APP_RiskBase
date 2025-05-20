@@ -4,6 +4,16 @@ from fastapi.encoders import jsonable_encoder
 from typing import List, Optional, Dict, Any
 from ...domain.models.user import User
 from ..dependencies import get_current_active_user, get_current_admin_user
+import pandas as pd
+import numpy as np
+from sqlalchemy import (
+    create_engine, MetaData, Table, Column, Integer, String, DECIMAL,
+    select, insert, update as sqlalchemy_update
+)
+import os
+from datetime import datetime
+from pydantic import BaseModel
+import traceback
 from ...services import (
     get_data_sap,
     df_matrices_avon_natura,
@@ -17,16 +27,6 @@ from ...services import (
     process_dataframe_otras_marcas,
     combine_final_dataframes
 )
-import pandas as pd
-import numpy as np
-from sqlalchemy import (
-    create_engine, MetaData, Table, Column, Integer, String, DECIMAL,
-    select, insert, update as sqlalchemy_update
-)
-import os
-from datetime import datetime
-from pydantic import BaseModel
-import traceback
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
@@ -34,6 +34,7 @@ router = APIRouter(prefix="/risk", tags=["risk"])
 #          ENDPOINTS PARA ADMINISTRADORES Y USUARIOS REGULARES                 #
 # ============================================================================ #
 
+# Endpoint para consultar la base de riesgo por mes y año específicos
 @router.post("/consult-riskbase", response_model=Dict[str, Any])
 async def consult_riskbase(
     mes: int = Query(..., ge=1, le=12, description="Mes a consultar (1-12)"),
@@ -93,6 +94,7 @@ async def consult_riskbase(
         )
 
 
+# Endpoint para visualizar los datos de un archivo temporal previamente generado con paginación
 @router.get("/data-view")
 async def get_risk_data(
     temp_file: Optional[str] = None,
@@ -159,6 +161,7 @@ async def get_risk_data(
         raise HTTPException(status_code=500, detail=f"Error al obtener los datos: {e}")
 
 
+# Endpoint para exportar los datos procesados a un archivo Excel para su descarga
 @router.get("/export-excel")
 async def export_to_excel(
     filename: Optional[str] = None,
@@ -215,6 +218,8 @@ class FileNameRequest(BaseModel):
 #             ENDPOINTS EXCLUSIVOS PARA ADMINISTRADORES                        #
 # ============================================================================ #
 
+
+# Endpoint para ejecutar el proceso completo de extracción, transformación y carga de datos de base riesgo
 @router.post("/process", response_model=Dict[str, Any])
 async def process_riskbase(
     current_user: User = Depends(get_current_admin_user)
@@ -284,6 +289,7 @@ async def process_riskbase(
         )
 
 
+# Endpoint para guardar los datos procesados en la base de datos
 @router.post("/save-to-db")
 async def save_to_database(
     request: FileNameRequest,
@@ -331,6 +337,7 @@ async def save_to_database(
         )
 
 
+# Endpoint para obtener todas las matrices almacenadas en la base de datos
 @router.get("/matrices-view", response_model=Dict[str, Any])
 async def get_matrices(
     current_user: User = Depends(get_current_admin_user)
@@ -376,6 +383,7 @@ async def get_matrices(
         )
 
 
+# Endpoint para actualizar las matrices de configuración de base riesgo
 @router.put("/matrices-save", response_model=Dict[str, Any])
 async def update_matrices(
     data: Dict[str, Any],
@@ -582,6 +590,7 @@ async def update_matrices(
     }
 
 
+# Endpoint para eliminar un archivo temporal Excel
 @router.delete("/delete-temp-file")
 async def delete_temp_file(
     filename: str = None,

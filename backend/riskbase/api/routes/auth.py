@@ -17,7 +17,7 @@ from ...domain.auth import (
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Endpoint para obtener el usuario actual (solo administradores)
+# Endpoint para registrar un nuevo usuario
 @router.post("/register", response_model=User, status_code=201)
 async def register_user(user: UserCreate = Body(...), current_user: User = Depends(get_current_admin_user)):
     """
@@ -63,6 +63,7 @@ async def register_user(user: UserCreate = Body(...), current_user: User = Depen
         is_active=db_user.is_active
     )
 
+# Endpoint para iniciar sesión y obtener un token de acceso
 @router.post("/login", response_model=Token)
 async def login_user(email: str = Body(...), password: str = Body(...)):
     """

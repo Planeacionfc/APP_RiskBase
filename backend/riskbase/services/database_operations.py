@@ -7,6 +7,10 @@ from datetime import datetime
 
 load_dotenv()
 
+# ----------------------------------------------#
+#           FUNCIONES DE CONEXIÓN A BD          #
+# ----------------------------------------------#
+
 def get_sql_engine():
     """
     Establece la conexión a SQL Server mediante SQLAlchemy.
@@ -63,6 +67,12 @@ def execute_query(query):
         engine.dispose()  # Cierra la conexión
     return df
 
+
+
+# ----------------------------------------------#
+#           FUNCIONES DE CONSULTA A BD          #
+# ----------------------------------------------#
+
 def get_inventario_matriz():
     """
     Extrae todos los registros de la tabla InventarioMatriz.
@@ -103,6 +113,12 @@ def get_matrices_base_riesgo():
     FROM MatrizBaseRiesgo
     """
     return execute_query(query)
+
+
+
+# ----------------------------------------------#
+#           FUNCIONES DE PROCESAMIENTO          #
+# ----------------------------------------------#
 
 def df_matrices_merge_raw():
     """
@@ -241,7 +257,15 @@ def df_matrices_otros_tipos():
     
     return df[mask].reset_index(drop=True)
 
-def upload_dataframe_to_db(df_final_combined: pd.DataFrame) -> None:
+
+
+# ----------------------------------------------#
+#           FUNCIONES DE EXPORTACIÓN            #
+# ----------------------------------------------#
+
+def upload_dataframe_to_db(
+    df_final_combined: pd.DataFrame
+) -> None:
     """
     Sube el DataFrame 'df_final_combined' a la base de datos en la tabla 'InventarioBaseRiesgo'.
     Se utiliza SQLAlchemy para establecer la conexión y el método to_sql de pandas para insertar
@@ -297,7 +321,11 @@ def upload_dataframe_to_db(df_final_combined: pd.DataFrame) -> None:
     finally:
         engine.dispose()
 
-def export_dataframe_to_excel(df: pd.DataFrame, filename: str = None, output_dir: str = None) -> str:
+def export_dataframe_to_excel(
+    df: pd.DataFrame,
+    filename: str = None,
+    output_dir: str = None
+) -> str:
     """
     Exporta un DataFrame a un archivo Excel en la ruta especificada o en el directorio de trabajo actual.
     Si no se especifica un nombre de archivo, genera uno automáticamente con la fecha actual.
@@ -340,7 +368,10 @@ def export_dataframe_to_excel(df: pd.DataFrame, filename: str = None, output_dir
         print(f"Error al exportar a Excel: {e}")
         raise
 
-def get_inventory_by_month_year(mes: int, anio: int) -> pd.DataFrame:
+def get_inventory_by_month_year(
+    mes: int,
+    anio: int
+) -> pd.DataFrame:
     """
     Consulta la tabla InventarioBaseRiesgo filtrando por mes y año de registro.
     Obtiene todos los campos de la tabla y realiza conversiones de tipos de datos para
