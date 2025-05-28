@@ -16,28 +16,31 @@ app = FastAPI(
     version="1.0.0",
 )
 
-origins = [
-    "http://localhost:3000",  # Cambia esto por el dominio real si es necesario
-]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://172.15.2.88:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 # Manejo global de errores
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
-        status_code=500,
-        content={"detail": f"Error interno del servidor: {str(exc)}"}
+        status_code=500, content={"detail": f"Error interno del servidor: {str(exc)}"}
     )
+
 
 # Incluir las rutas de la API
 app.include_router(api_router)
+
 
 # Ruta raíz
 @app.get("/")

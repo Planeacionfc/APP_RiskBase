@@ -13,9 +13,13 @@ from ...domain.auth import (
     UserDB,
     UserRole
 )
+import logging
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# Configuración del logger para este módulo
+logger = logging.getLogger(__name__)
 
 # Endpoint para registrar un nuevo usuario
 @router.post("/register", response_model=User, status_code=201)
@@ -39,10 +43,13 @@ async def register_user(user: UserCreate = Body(...), current_user: User = Depen
     Raises:
         HTTPException: Si el usuario o email ya existe en la base de datos
     """
+    
+    logger.info(f"[register] Registrando nuevo usuario: {user.username}")
     db = SessionLocal()
     existing_user = db.query(UserDB).filter((UserDB.username == user.username) | (UserDB.email == user.email)).first()
     if existing_user:
         db.close()
+        logger.error(f"[register] Error al registrar usuario: {user.username}")
         raise HTTPException(status_code=400, detail="El usuario o email ya existe.")
     hashed_password = pwd_context.hash(user.password)
     db_user = UserDB(
@@ -55,6 +62,7 @@ async def register_user(user: UserCreate = Body(...), current_user: User = Depen
     db.commit()
     db.refresh(db_user)
     db.close()
+    logger.info(f"[register] Usuario registrado exitosamente: {user.username}")
     return User(
         username=db_user.username,
         email=db_user.email,
@@ -62,6 +70,7 @@ async def register_user(user: UserCreate = Body(...), current_user: User = Depen
         role=db_user.role,
         is_active=db_user.is_active
     )
+    
 
 # Endpoint para iniciar sesión y obtener un token de acceso
 @router.post("/login", response_model=Token)
@@ -85,10 +94,13 @@ async def login_user(email: str = Body(...), password: str = Body(...)):
     Raises:
         HTTPException: Si las credenciales son incorrectas
     """
+    
+    logger.info(f"[login] Iniciando sesión para el usuario: {email}")
     db = SessionLocal()
     user = db.query(UserDB).filter(UserDB.email == email).first()
     db.close()
     if not user or not pwd_context.verify(password, user.hashed_password):
+        logger.error(f"[login] Credenciales incorrectas para el usuario: {email}")
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -98,4 +110,5 @@ async def login_user(email: str = Body(...), password: str = Body(...)):
         },
         expires_delta=access_token_expires
     )
+    logger.info(f"[login] Token generado exitosamente para el usuario: {user.username}")
     return {"access_token": access_token, "token_type": "Bearer"}

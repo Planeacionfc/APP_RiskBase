@@ -1,6 +1,8 @@
 import uvicorn
 import os
 from dotenv import load_dotenv
+import logging
+from logging.handlers import TimedRotatingFileHandler
 
 # Cargar variables de entorno
 load_dotenv()
@@ -30,3 +32,21 @@ if __name__ == "__main__":
     
     # Iniciar el servidor
     uvicorn.run("riskbase.main:app", host=host, port=port, reload=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler("app.log"),
+        logging.StreamHandler()
+    ]
+)
+
+handler = TimedRotatingFileHandler(
+    "app.log", when="midnight", interval=1, backupCount=7, encoding="utf-8"
+)  # Rota cada medianoche, guarda 7 días de logs
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[handler, logging.StreamHandler()]
+)

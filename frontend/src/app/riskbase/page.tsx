@@ -369,14 +369,16 @@ export default function RiskBasePage() {
         setSaving(false);
         return;
       }
+      // Mostrar alerta de finalización y refrescar la página al dar OK
       await showAlert({
         position: "center",
-        icon: 'success',
-        title: '¡Proceso finalizado!',
-        text: 'Datos guardados exitosamente.',
+        icon: "success",
+        title: "¡Proceso finalizado!",
+        text: "El proceso ha terminado exitosamente.",
         showConfirmButton: true,
-        confirmButtonText: 'OK',
+        confirmButtonText: "OK"
       });
+      window.location.reload();
     } catch (err: any) {
       setError(err.message || "Error inesperado");
     } finally {

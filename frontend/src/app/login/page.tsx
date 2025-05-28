@@ -110,15 +110,28 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center from-skyBlue via-bone to-white dark:from-skyBlue dark:via-none dark:to-[#202020]">
       {/* Contenedor principal del formulario con estilo corporativo */}
-      <div className="w-full max-w-sm p-8 rounded-4xl shadow-xl bg-[#2c3e64] shadow-md flex flex-col items-center">
+      <div className="w-full max-w-sm p-8 rounded-4xl shadow-xl 
+        bg-white dark:bg-[#2c3e64] 
+        shadow-md flex flex-col items-center
+        border border-gray-200 dark:border-none
+      ">
         {/* Logo de la empresa */}
-        <div className="flex flex-col items-center mb-8" >
+        <div className="flex flex-col items-center mb-8">
+          {/* Logo dinámico según el modo de color */}
+          <Image
+            src="/image/Prebel_AzulClaro_SF.webp"
+            alt="Logo Prebel Azul"
+            width={200}
+            height={200}
+            className="mb-2 drop-shadow-lg block dark:hidden"
+            priority // Carga prioritaria para mejorar LCP
+          />
           <Image
             src="/image/Prebel_Blanco.webp"
             alt="Logo Prebel Blanco"
             width={200}
             height={200}
-            className="mb-2 drop-shadow-lg"
+            className="mb-2 drop-shadow-lg hidden dark:block"
             priority // Carga prioritaria para mejorar LCP
           />
         </div>
@@ -127,26 +140,42 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-6 w-full">
           {/* Campo de email */}
           <div>
-            <label className="block text-lg font-semibold text-gray-200 mb-1 ">Email</label>
+            <label className="block text-lg font-semibold text-gray-700 dark:text-gray-200 mb-1 ">Email</label>
             <input
               type="email" // Validación de formato de email
               value={email}
               onChange={e => setEmail(e.target.value)}
               required // Campo obligatorio
-              className="w-full px-5 py-3 bg-[#222a3a] border border-gray-400 rounded-lg text-[var(--color-cloud)] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-skyBlue)] shadow-[0_1.5px_8px_0_#2225] transition-all duration-200 text-base"
+              className="w-full px-5 py-3 
+                bg-white dark:bg-[#222a3a] 
+                border border-gray-300 dark:border-gray-400 
+                rounded-lg 
+                text-gray-800 dark:text-[var(--color-cloud)] 
+                placeholder-gray-400 
+                focus:outline-none focus:ring-2 focus:ring-[var(--color-skyBlue)] 
+                shadow-[0_1.5px_8px_0_#2225] 
+                transition-all duration-200 text-base"
               placeholder="ejemplo@prebel.com"
               autoComplete="username" // Mejora la experiencia de autocompletado
             />
           </div>
           {/* Campo de contraseña */}
           <div>
-            <label className="block text-lg font-semibold text-gray-200 mb-1">Contraseña</label>
+            <label className="block text-lg font-semibold text-gray-700 dark:text-gray-200 mb-1">Contraseña</label>
             <input
               type="password" // Campo de tipo password para ocultar caracteres
               value={password}
               onChange={e => setPassword(e.target.value)}
               required // Campo obligatorio
-              className="w-full px-5 py-3 bg-[#222a3a] border border-gray-400 rounded-lg text-[var(--color-cloud)] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-skyBlue)] shadow-[0_1.5px_8px_0_#2225] transition-all duration-200 text-base"
+              className="w-full px-5 py-3 
+                bg-white dark:bg-[#222a3a] 
+                border border-gray-300 dark:border-gray-400 
+                rounded-lg 
+                text-gray-800 dark:text-[var(--color-cloud)] 
+                placeholder-gray-400 
+                focus:outline-none focus:ring-2 focus:ring-[var(--color-skyBlue)] 
+                shadow-[0_1.5px_8px_0_#2225] 
+                transition-all duration-200 text-base"
               placeholder="••••••••"
               autoComplete="current-password" // Facilita el autocompletado seguro
             />
@@ -155,7 +184,12 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading} // Deshabilita el botón durante la carga
-            className="w-full py-2 px-4 bg-skyBlue hover:bg-sky-600 dark:bg-bone dark:hover:bg-bone/80 text-white dark:text-skyBlue font-semibold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-60"
+            className="w-full py-2 px-4 
+              bg-skyBlue hover:bg-sky-600 
+              dark:bg-bone dark:hover:bg-bone/80 
+              text-white dark:text-skyBlue 
+              font-semibold rounded-lg shadow-md 
+              transition-colors duration-200 disabled:opacity-60"
           >
             {loading ? 'Entrando...' : 'Entrar'} {/* Texto dinámico según estado */}
           </button>
