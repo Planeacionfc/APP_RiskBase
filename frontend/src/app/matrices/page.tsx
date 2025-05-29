@@ -89,29 +89,27 @@ export default function MatricesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Para edición inline
   const processRowUpdate = async (newRow: MatrizRow) => {
     const updatedRows = rows.map((row) =>
       row.id_politica_base_riesgo === newRow.id_politica_base_riesgo ? newRow : row
     );
     setRows(updatedRows);
-    // Puedes guardar automáticamente aquí o dejarlo para el botón "Guardar Cambios"
     return newRow;
   };
 
   // Columnas para MUI DataGrid
   const columns: GridColDef[] = [
     { field: "id_politica_base_riesgo", headerName: "ID Política", width: 120, editable: false },
-    { field: "concatenado", headerName: "Concatenado", width: 180, editable: true },
-    { field: "segmento", headerName: "Segmento", width: 140, editable: true },
-    { field: "permanencia", headerName: "Permanencia", width: 140, editable: true },
+    { field: "concatenado", headerName: "Concatenado", width: 180, editable: false },
+    { field: "segmento", headerName: "Segmento", width: 140, editable: false },
+    { field: "permanencia", headerName: "Permanencia", width: 140, editable: false },
     { field: "factor_prov", headerName: "Factor Prov", width: 120, editable: true, type: 'number' },
     { field: "clasificacion", headerName: "Clasificación", width: 140, editable: true },
-    { field: "tipo_matriz", headerName: "Tipo Matriz", width: 140, editable: true },
-    { field: "subsegmento", headerName: "Subsegmento", width: 140, editable: true },
-    { field: "estado", headerName: "Estado", width: 120, editable: true },
-    { field: "cobertura", headerName: "Cobertura", width: 120, editable: true },
-    { field: "negocio", headerName: "Negocio", width: 120, editable: true },
+    { field: "tipo_matriz", headerName: "Tipo Matriz", width: 140, editable: false },
+    { field: "subsegmento", headerName: "Subsegmento", width: 140, editable: false },
+    { field: "estado", headerName: "Estado", width: 120, editable: false },
+    { field: "cobertura", headerName: "Cobertura", width: 120, editable: false },
+    { field: "negocio", headerName: "Negocio", width: 120, editable: false },
   ];
 
   // Guarda los cambios al backend

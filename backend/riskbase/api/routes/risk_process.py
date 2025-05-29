@@ -98,7 +98,7 @@ async def consult_riskbase(
                 detail=f"No se encontraron datos para mes={mes} y año={anio}",
             )
 
-        excel_file = f"temp_risk_data_{current_user.username}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        excel_file = f"Archivo_temporal_{datetime.now().strftime('%d-%m-%y')}.xlsx"
         temp_dir = os.environ.get("TEMP_DIR")
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
@@ -114,7 +114,7 @@ async def consult_riskbase(
             },
         }
         logger.info(
-            f"[consult-riskbase] Consulta exitosa para usuario: {current_user.username}"
+            f"[consult-riskbase] Consulta exitosa de información de la base de datos"
         )
         return result
     except Exception as e:
@@ -156,12 +156,12 @@ async def get_risk_data(
         HTTPException: Si no se proporciona archivo, no existe o hay error al procesarlo
     """
     logger.info(
-        f"[data-view] Usuario: {current_user.username} visualizando archivo temporal: {temp_file}"
+        f"[data-view] Se incia el proceso de visualización del archivo temporal"
     )
     try:
         if not temp_file:
             logger.warning(
-                f"[data-view] No se proporcionó archivo temporal por usuario: {current_user.username}"
+                f"[data-view] No se proporcionó archivo temporal"
             )
             raise HTTPException(
                 status_code=400, detail="No se proporcionó archivo temporal."
@@ -193,7 +193,7 @@ async def get_risk_data(
         safe_records = jsonable_encoder(records)
 
         logger.info(
-            f"[data-view] Visualización exitosa de archivo temporal: {temp_file} por usuario: {current_user.username}"
+            f"[data-view] Visualización exitosa del archivo temporal"
         )
         return JSONResponse(
             {
@@ -236,7 +236,7 @@ async def export_to_excel(
         HTTPException: Si no se proporciona nombre de archivo, no existe o hay error al procesarlo
     """
     logger.info(
-        f"[export-excel] Usuario: {current_user.username} exportando archivo: {filename}"
+        f"[export-excel] Exportando archivo temporal: {filename}"
     )
     try:
         if filename:
@@ -248,7 +248,7 @@ async def export_to_excel(
                     detail="Archivo temporal no encontrado. Ejecute el proceso primero.",
                 )
             logger.info(
-                f"[export-excel] Archivo exportado correctamente: {filename} por usuario: {current_user.username}"
+                f"[export-excel] Archivo temporal exportado correctamente"
             )
             return FileResponse(
                 path=file_path,
@@ -257,7 +257,7 @@ async def export_to_excel(
             )
         else:
             logger.warning(
-                f"[export-excel] No se proporcionó nombre de archivo por usuario: {current_user.username}"
+                f"[export-excel] No se proporcionó el nombre del archivo temporal"
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -297,13 +297,13 @@ async def process_riskbase(current_user: User = Depends(get_current_admin_user))
 
     Returns:
         Dict[str, Any]: Resultado del proceso con información sobre filas procesadas,
-                       columnas y nombre del archivo temporal generado
+        columnas y nombre del archivo temporal generado
 
     Raises:
         HTTPException: Si no se pueden obtener datos de SAP o si ocurre un error durante el proceso
     """
     logger.info(
-        f"[process] Usuario: {current_user.username} ejecutando proceso de riesgo"
+        f"[process] Realizando el procesamiento de la base de riesgo"
     )
     try:
         matrices_avon_natura = df_matrices_avon_natura()
@@ -312,7 +312,7 @@ async def process_riskbase(current_user: User = Depends(get_current_admin_user))
         df_sap = get_data_sap()
 
         if df_sap is None or df_sap.empty:
-            logger.error(f"[process] No se pudieron obtener datos de SAP")
+            logger.error(f"[process] No se pudieron obtener los datos de SAP")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No se pudieron obtener datos de SAP",
@@ -336,7 +336,7 @@ async def process_riskbase(current_user: User = Depends(get_current_admin_user))
         )
         
         logger.info(f"[process] Generando archivo Excel temporal")
-        excel_file = f"archivo_temporal_{current_user.username}_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+        excel_file = f"Archivo_temporal_{datetime.now().strftime('%d-%m-%y')}.xlsx"
         temp_dir = os.environ.get("TEMP_DIR")
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
@@ -352,7 +352,7 @@ async def process_riskbase(current_user: User = Depends(get_current_admin_user))
             },
         }
         logger.info(
-            f"[process] Proceso ejecutado correctamente por usuario: {current_user.username}"
+            f"[process] Proceso de base de riesgo ejecutado correctamente"
         )
         return result
     except Exception as e:
@@ -389,7 +389,7 @@ async def save_to_database(
         HTTPException: Si el archivo no existe o hay error al guardarlo en la base de datos
     """
     logger.info(
-        f"[save-to-db] Usuario: {current_user.username} guardando archivo: {request.filename} en la base de datos"
+        f"[save-to-db] Usuario: {current_user.username} guardando la información en la base de datos"
     )
     try:
         temp_dir = os.environ.get("TEMP_DIR")
@@ -403,7 +403,7 @@ async def save_to_database(
         df = pd.read_excel(file_path)
         upload_dataframe_to_db(df)
         logger.info(
-            f"[save-to-db] Datos guardados correctamente en la base de datos por usuario: {current_user.username}"
+            f"[save-to-db] Datos guardados correctamente en la base de datos"
         )
         return {
             "success": True,
@@ -437,7 +437,7 @@ async def get_matrices(current_user: User = Depends(get_current_admin_user)):
         HTTPException: Si no se encuentran matrices o hay error al consultarlas
     """
     logger.info(
-        f"[matrices-view] Usuario: {current_user.username} consultando matrices"
+        f"[matrices-view] Usuario: {current_user.username} consultando matrices de base de riesgo"
     )
     try:
         # Obtener datos de la base de datos
@@ -453,7 +453,7 @@ async def get_matrices(current_user: User = Depends(get_current_admin_user)):
         matrices_dict = matrices.to_dict(orient="records")
 
         logger.info(
-            f"[matrices-view] Matrices consultadas correctamente por usuario: {current_user.username}"
+            f"[matrices-view] Matrices consultadas correctamente"
         )
         return {
             "matrices": matrices_dict,
@@ -475,9 +475,9 @@ async def update_matrices(
     data: Dict[str, Any], current_user: User = Depends(get_current_admin_user)
 ):
     """
-    Actualiza los campos de las matrices de configuración de riesgo.
+    Actualiza los campos de las matrices de la política de la base de riesgo.
 
-    Este endpoint permite modificar los campos de las matrices de configuración,
+    Este endpoint permite modificar los campos de las matrices de la política de la base de riesgo,
     incluyendo factor_prov y clasificacion en MatrizBaseRiesgo, así como campos
     relacionados en InventarioMatriz. Antes de realizar cualquier actualización,
     guarda el estado actual en la tabla histórica MatrizBaseRiesgoHist.
@@ -490,24 +490,29 @@ async def update_matrices(
 
     Returns:
         Dict[str, Any]: Resultado de la operación con información sobre filas actualizadas
-                       y posibles errores
+        y posibles errores
 
     Raises:
         HTTPException: Si no se envían filas para actualizar o hay error en el proceso
     """
+    # Aquí simplemente registramos en los logs que el usuario va a actualizar matrices.
     logger.info(
-        f"[matrices-save] Usuario: {current_user.username} actualizando matrices"
+        f"[matrices-save] Usuario: {current_user.username} actualizando matrices de base de riesgo"
     )
+    # Obtenemos la lista de matrices que el usuario quiere actualizar.
+    # Si no hay ninguna, avisamos y detenemos el proceso.
     matrices = data.get("rows") or data.get("matrices") or []
     if not matrices:
         logger.warning(
-            f"[matrices-save] No se enviaron filas para actualizar por usuario: {current_user.username}"
+            f"[matrices-save] No se enviaron filas para actualizar"
         )
         raise HTTPException(
             status_code=400, detail="No se enviaron filas para actualizar."
         )
 
-    # Conexión
+    # --- CONEXIÓN A LA BASE DE DATOS ---
+    # Aquí preparamos todo lo necesario para conectarnos a la base de datos.
+    # Se obtienen los datos de acceso y se crea el motor de conexión.
     usuario = os.getenv("DB_USER")
     pwd = os.getenv("DB_PASSWORD")
     server = os.getenv("DB_SERVER")
@@ -519,7 +524,7 @@ async def update_matrices(
     )
 
     metadata = MetaData()
-    # Tabla principal
+    # Definimos la tabla principal donde están las matrices base de riesgo.
     matriz_table = Table(
         "MatrizBaseRiesgo",
         metadata,
@@ -533,6 +538,7 @@ async def update_matrices(
         schema=None,  # añade tu schema si aplica
     )
 
+    # Definimos la tabla donde se guarda información adicional de las matrices.
     inventario_table = Table(
         "InventarioMatriz",
         metadata,
@@ -544,7 +550,7 @@ async def update_matrices(
         Column("negocio", String(255)),
     )
 
-    # Tabla histórica
+    # Definimos la tabla histórica, donde se guarda un registro de cómo estaban las matrices antes de cada cambio.
     hist_table = Table(
         "MatrizBaseRiesgoHist",
         metadata,
@@ -567,9 +573,14 @@ async def update_matrices(
     errors = []
     updated = 0
 
+    # Aquí empieza la parte principal donde se hacen los cambios.
     with engine.begin() as conn:
-        # 0) SNAPSHOT COMPLETO: Guardar todos los registros actuales en el histórico antes de cualquier update
+        """
+        Antes de hacer cualquier cambio, guardamos una copia de cómo están todas las matrices en este momento.
+        Así, si en el futuro necesitamos saber cómo estaban antes de una actualización, podemos consultarlo en la tabla histórica.
+        """
         try:
+            # Obtenemos todos los registros actuales de las matrices y su información relacionada.
             snapshot_stmt = select(
                 matriz_table.c.id_politica_base_riesgo,
                 matriz_table.c.concatenado,
@@ -590,20 +601,27 @@ async def update_matrices(
                 )
             )
             snapshot_rows = conn.execute(snapshot_stmt).fetchall()
+            # Si hay registros, los guardamos en la tabla histórica.
             if snapshot_rows:
                 conn.execute(
                     insert(hist_table), [dict(r._mapping) for r in snapshot_rows]
                 )
         except Exception as ex:
+            # Si algo falla aquí, simplemente seguimos, ya que esto es solo para respaldo.
             pass
 
+        # Ahora vamos a procesar cada fila que el usuario quiere actualizar.
         for row in matrices:
             id_ = row.get("id_politica_base_riesgo")
             if id_ is None:
+                # Si no viene el ID, no podemos hacer nada con esa fila.
                 errors.append({"id": None, "error": "Falta id_politica_base_riesgo"})
                 continue
 
-            # 1) Recuperar estado actual (JOIN para snapshot)
+            """
+            Antes de actualizar, buscamos cómo está actualmente esa fila en la base de datos.
+            Esto nos sirve para guardar un respaldo de ese registro específico antes de cambiarlo.
+            """
             try:
                 join_stmt = (
                     select(
@@ -627,10 +645,13 @@ async def update_matrices(
                 errors.append({"id": id_, "error": f"Consulta fallida: {ex}"})
                 continue
             if not current:
+                # Si no encontramos el registro, lo reportamos como error.
                 errors.append({"id": id_, "error": "ID no encontrado"})
                 continue
 
-            # 2) Insertar snapshot en el histórico
+            """
+            Guardamos el estado actual de la fila en la tabla histórica, para tener un registro de cómo estaba antes del cambio.
+            """
             try:
                 conn.execute(
                     insert(hist_table).values(
@@ -651,7 +672,10 @@ async def update_matrices(
                 errors.append({"id": id_, "error": f"Histórico fallido: {ex}"})
                 continue
 
-            # 3) Actualizar ambas tablas según corresponda
+            """
+            Ahora sí, preparamos los datos que realmente se van a actualizar.
+            Solo se actualizan los campos que vienen en la petición y que no son nulos.
+            """
             matriz_fields = [
                 "concatenado",
                 "segmento",
@@ -673,9 +697,10 @@ async def update_matrices(
             }
 
             if not update_dict_matriz and not update_dict_inventario:
+                # Si no hay nada para actualizar, lo reportamos.
                 errors.append({"id": id_, "error": "Nada para actualizar"})
                 continue
-            # Update MatrizBaseRiesgo
+            # Actualizamos la tabla principal si hay cambios para ella.
             if update_dict_matriz:
                 stmt = sqlalchemy_update(matriz_table).where(
                     matriz_table.c.id_politica_base_riesgo == id_
@@ -685,7 +710,7 @@ async def update_matrices(
                     updated += result.rowcount
                 except Exception as ex:
                     errors.append({"id": id_, "error": str(ex)})
-            # Update InventarioMatriz
+            # Actualizamos la tabla de inventario si hay cambios para ella.
             if update_dict_inventario:
                 stmt_inv = sqlalchemy_update(inventario_table).where(
                     inventario_table.c.id_politica_base_riesgo == id_
@@ -695,9 +720,11 @@ async def update_matrices(
                     updated += result_inv.rowcount
                 except Exception as ex:
                     errors.append({"id": id_, "error": str(ex)})
+    # Al final, dejamos un registro en los logs de cuántas filas se actualizaron y cuántos errores hubo.
     logger.info(
-        f"[matrices-save] Matrices actualizadas por usuario: {current_user.username}. Filas actualizadas: {updated}, Errores: {len(errors)}"
+        f"[matrices-save] Matrices actualizadas correctamente. Filas actualizadas: {updated}, Errores: {len(errors)}"
     )
+    # Devolvemos un resumen de lo que pasó: si fue exitoso, cuántas filas se actualizaron y detalles de los errores si los hubo.
     return {
         "success": len(errors) == 0,
         "message": f"{updated} filas actualizadas. {len(errors)} errores.",
@@ -731,12 +758,12 @@ async def delete_temp_file(
         HTTPException: Si no se proporciona nombre de archivo o hay error al eliminarlo
     """
     logger.info(
-        f"[delete-temp-file] Usuario: {current_user.username} eliminando archivo: {filename}"
+        f"[delete-temp-file] Se inicia el proceso de eliminación del archivo temporal"
     )
     try:
         if not filename:
             logger.warning(
-                f"[delete-temp-file] No se proporcionó nombre de archivo por usuario: {current_user.username}"
+                f"[delete-temp-file] No se proporcionó el nombre del archivo"
             )
             raise HTTPException(
                 status_code=400, detail="No se proporcionó el nombre del archivo."
@@ -746,16 +773,16 @@ async def delete_temp_file(
         if os.path.exists(file_path):
             os.remove(file_path)
             logger.info(
-                f"[delete-temp-file] Archivo eliminado correctamente: {filename} por usuario: {current_user.username}"
+                f"[delete-temp-file] Archivo temporal eliminado correctamente"
             )
             return {"success": True, "message": "Archivo eliminado."}
         else:
             logger.warning(
-                f"[delete-temp-file] El archivo no existe: {filename} (usuario: {current_user.username})"
+                f"[delete-temp-file] El archivo temporal no existe"
             )
-            return {"success": False, "message": "El archivo no existe."}
+            return {"success": False, "message": "El archivo temporal no existe."}
     except Exception as e:
         logger.error(f"[delete-temp-file] Error: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Error al eliminar archivo: {str(e)}"
+            status_code=500, detail=f"Error al eliminar el archivo temporal"
         )
