@@ -73,20 +73,29 @@ export default function MatricesPage() {
 
   // Al montar, traemos las matrices
   useEffect(() => {
+    let isMounted = true;
     setLoading(true);
     fetchMatrices()
       .then((data) => {
+        if (!isMounted) return;
         setRows(data.matrices || []);
         setOriginalRows(data.matrices || []);
       })
-      .catch(() =>
+      .catch(() => {
+        if (!isMounted) return;
         Swal.fire({
           icon: "error",
           title: "Error",
           text: "No se pudieron obtener las matrices.",
-        })
-      )
-      .finally(() => setLoading(false));
+        });
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const processRowUpdate = async (newRow: MatrizRow) => {
