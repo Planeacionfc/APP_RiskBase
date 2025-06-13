@@ -11,7 +11,7 @@ const FFFAcid = localFont({
 const acidGroteskLight = localFont({ src: "./fonts/acid-grotesk-light.woff" });
 
 export const metadata: Metadata = {
-  title: "PF Manager",
+  title: "ManagerPF",
   description: "Aplicativo de Planeación Financiera para gestionar proyectos",
   icons: {
     icon: "/image/prebel_favicon.png"

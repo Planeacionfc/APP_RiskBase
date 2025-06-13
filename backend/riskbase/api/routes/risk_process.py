@@ -98,7 +98,7 @@ async def consult_riskbase(
                 detail=f"No se encontraron datos para mes={mes} y año={anio}",
             )
 
-        excel_file = f"Archivo_temporal_{datetime.now().strftime('%d-%m-%y')}.xlsx"
+        excel_file = f"Archivo_temporal_{datetime.now().strftime('%d-%m-%y_%H-%M')}.xlsx"
         temp_dir = os.environ.get("TEMP_DIR")
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
@@ -160,9 +160,7 @@ async def get_risk_data(
     )
     try:
         if not temp_file:
-            logger.warning(
-                f"[data-view] No se proporcionó archivo temporal"
-            )
+            logger.warning(f"[data-view] No se proporcionó archivo temporal")
             raise HTTPException(
                 status_code=400, detail="No se proporcionó archivo temporal."
             )
@@ -192,9 +190,7 @@ async def get_risk_data(
         records = df_paginated.to_dict(orient="records")
         safe_records = jsonable_encoder(records)
 
-        logger.info(
-            f"[data-view] Visualización exitosa del archivo temporal"
-        )
+        logger.info(f"[data-view] Visualización exitosa del archivo temporal")
         return JSONResponse(
             {
                 "data": safe_records,
@@ -235,9 +231,7 @@ async def export_to_excel(
     Raises:
         HTTPException: Si no se proporciona nombre de archivo, no existe o hay error al procesarlo
     """
-    logger.info(
-        f"[export-excel] Exportando archivo temporal: {filename}"
-    )
+    logger.info(f"[export-excel] Exportando archivo temporal: {filename}")
     try:
         if filename:
             temp_dir = os.environ.get("TEMP_DIR")
@@ -247,9 +241,7 @@ async def export_to_excel(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Archivo temporal no encontrado. Ejecute el proceso primero.",
                 )
-            logger.info(
-                f"[export-excel] Archivo temporal exportado correctamente"
-            )
+            logger.info(f"[export-excel] Archivo temporal exportado correctamente")
             return FileResponse(
                 path=file_path,
                 filename=os.path.basename(file_path),
@@ -283,12 +275,12 @@ class FileNameRequest(BaseModel):
 
 # Endpoint para ejecutar el proceso completo de extracción, transformación y carga de datos de base riesgo
 @router.post("/process", response_model=Dict[str, Any])
-async def process_riskbase(current_user: User = Depends(get_current_admin_user)):
+async def process_riskbase(current_user: User = Depends(get_current_active_user)):
     """
     Ejecuta el proceso completo de extracción, transformación y carga de datos de riesgo.
 
     Este endpoint realiza las siguientes operaciones:
-    1. Obtiene las matrices de configuración para AVON/NATURA y otros tipos
+    1. Obtiene las matrices de configuración para AVON/NATURA y otros marcas
     2. Extrae datos de SAP
     3. Filtra y procesa los datos según el tipo de marca
     4. Combina los resultados y genera un archivo Excel temporal
@@ -302,9 +294,7 @@ async def process_riskbase(current_user: User = Depends(get_current_admin_user))
     Raises:
         HTTPException: Si no se pueden obtener datos de SAP o si ocurre un error durante el proceso
     """
-    logger.info(
-        f"[process] Realizando el procesamiento de la base de riesgo"
-    )
+    logger.info(f"[process] Realizando el procesamiento de la base de riesgo")
     try:
         matrices_avon_natura = df_matrices_avon_natura()
         matrices_otros_tipos = df_matrices_otros_tipos()
@@ -334,9 +324,9 @@ async def process_riskbase(current_user: User = Depends(get_current_admin_user))
         df_final_combined = combine_final_dataframes(
             df_final_avon_natura, df_final_otras_marcas
         )
-        
+
         logger.info(f"[process] Generando archivo Excel temporal")
-        excel_file = f"Archivo_temporal_{datetime.now().strftime('%d-%m-%y')}.xlsx"
+        excel_file = f"Archivo_temporal_{datetime.now().strftime('%d-%m-%y_%H-%M')}.xlsx"
         temp_dir = os.environ.get("TEMP_DIR")
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
@@ -351,9 +341,7 @@ async def process_riskbase(current_user: User = Depends(get_current_admin_user))
                 "total_records": len(df_final_combined),
             },
         }
-        logger.info(
-            f"[process] Proceso de base de riesgo ejecutado correctamente"
-        )
+        logger.info(f"[process] Proceso de base de riesgo ejecutado correctamente")
         return result
     except Exception as e:
         logger.error(f"[process] Error: {e}")
@@ -402,9 +390,7 @@ async def save_to_database(
             )
         df = pd.read_excel(file_path)
         upload_dataframe_to_db(df)
-        logger.info(
-            f"[save-to-db] Datos guardados correctamente en la base de datos"
-        )
+        logger.info(f"[save-to-db] Datos guardados correctamente en la base de datos")
         return {
             "success": True,
             "message": "Datos guardados correctamente en la base de datos",
@@ -452,9 +438,7 @@ async def get_matrices(current_user: User = Depends(get_current_admin_user)):
         # Convertir a diccionario para la respuesta JSON
         matrices_dict = matrices.to_dict(orient="records")
 
-        logger.info(
-            f"[matrices-view] Matrices consultadas correctamente"
-        )
+        logger.info(f"[matrices-view] Matrices consultadas correctamente")
         return {
             "matrices": matrices_dict,
             "total": len(matrices_dict),
@@ -503,9 +487,7 @@ async def update_matrices(
     # Si no hay ninguna, avisamos y detenemos el proceso.
     matrices = data.get("rows") or data.get("matrices") or []
     if not matrices:
-        logger.warning(
-            f"[matrices-save] No se enviaron filas para actualizar"
-        )
+        logger.warning(f"[matrices-save] No se enviaron filas para actualizar")
         raise HTTPException(
             status_code=400, detail="No se enviaron filas para actualizar."
         )
@@ -772,14 +754,10 @@ async def delete_temp_file(
         file_path = os.path.join(temp_dir, filename)
         if os.path.exists(file_path):
             os.remove(file_path)
-            logger.info(
-                f"[delete-temp-file] Archivo temporal eliminado correctamente"
-            )
+            logger.info(f"[delete-temp-file] Archivo temporal eliminado correctamente")
             return {"success": True, "message": "Archivo eliminado."}
         else:
-            logger.warning(
-                f"[delete-temp-file] El archivo temporal no existe"
-            )
+            logger.warning(f"[delete-temp-file] El archivo temporal no existe")
             return {"success": False, "message": "El archivo temporal no existe."}
     except Exception as e:
         logger.error(f"[delete-temp-file] Error: {e}")

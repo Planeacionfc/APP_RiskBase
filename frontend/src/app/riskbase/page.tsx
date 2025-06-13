@@ -2,6 +2,8 @@
 import React, { useState } from "react";
 import { showAlert } from "../../utils/swal";
 import { jwtDecode } from 'jwt-decode';
+import { useRouter } from "next/navigation";
+
 
 // --- INTERFAZ PARA JWT ---
 interface JwtPayloadWithRole {
@@ -19,6 +21,7 @@ export default function RiskBasePage() {
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState("");
   const [excelFile, setExcelFile] = useState<string>("");
+  const router = useRouter();
 
   // Estado para paginación de columnas
   const [columnPage, setColumnPage] = useState(0);
@@ -138,12 +141,8 @@ export default function RiskBasePage() {
     }
   };
 
-  // Procesar: llama a /risk/process (solo admins)
+  // Procesar: llama a /risk/process (ahora para todos los usuarios)
   const handleProcess = async () => {
-    if (!checkAdminRole()) {
-      await show403Alert();
-      return;
-    }
     await callProcess();
   };
 
@@ -447,6 +446,15 @@ export default function RiskBasePage() {
 
   return (
     <div className="flex flex-col items-center min-h-screen bg-white dark:bg-[#232836] px-15 py-10">
+      {/* Botón de retroceso */}
+      <div className="w-full flex justify-start mb-4">
+        <button
+          onClick={() => router.push('/')}
+          className="px-6 py-2 bg-skyBlue hover:bg-[#4278FA]/90 dark:bg-bone dark:hover:bg-bone/90 text-white dark:text-black font-semibold rounded-lg shadow-md transition-colors duration-200 text-lg flex items-center gap-2"
+        >
+          &#8592; Volver al inicio
+        </button>
+      </div>
       <h1 className="text-3xl md:text-4xl font-bold mb-8 mt-2 text-center text-skyBlue dark:text-bone">Procesamiento de Base de Riesgo</h1>
       <p className="text-center text-gray-700 dark:text-gray-300 mb-8">
         En esta sección se realizan los procesos de extracción, transformación y carga de datos de la base de riesgo.

@@ -33,20 +33,15 @@ if __name__ == "__main__":
     # Iniciar el servidor
     uvicorn.run("riskbase.main:app", host=host, port=port, reload=True)
 
+handler = TimedRotatingFileHandler(
+    "app.log", when="midnight", interval=1, backupCount=7, encoding="utf-8"
+)  # Rota cada medianoche, guarda 7 días de logs
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
-        logging.FileHandler("app.log"),
-        logging.StreamHandler()
+        handler,  # TimedRotatingFileHandler que ya maneja la escritura al archivo
+        logging.StreamHandler(),  # Para mostrar logs en consola
     ]
-)
-
-handler = TimedRotatingFileHandler(
-    "app.log", when="midnight", interval=1, backupCount=7, encoding="utf-8"
-)  # Rota cada medianoche, guarda 7 días de logs
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[handler, logging.StreamHandler()]
 )

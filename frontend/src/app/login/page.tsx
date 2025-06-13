@@ -155,7 +155,7 @@ export default function LoginPage() {
                 focus:outline-none focus:ring-2 focus:ring-[var(--color-skyBlue)] 
                 shadow-[0_1.5px_8px_0_#2225] 
                 transition-all duration-200 text-base"
-              placeholder="ejemplo@prebel.com"
+              placeholder="ejemplo@prebel.com.co"
               autoComplete="username" // Mejora la experiencia de autocompletado
             />
           </div>
@@ -176,7 +176,7 @@ export default function LoginPage() {
                 focus:outline-none focus:ring-2 focus:ring-[var(--color-skyBlue)] 
                 shadow-[0_1.5px_8px_0_#2225] 
                 transition-all duration-200 text-base"
-              placeholder="••••••••"
+              placeholder="•••••••••••"
               autoComplete="current-password" // Facilita el autocompletado seguro
             />
           </div>

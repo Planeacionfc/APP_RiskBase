@@ -11,8 +11,16 @@ load_dotenv()
 
 # Crear la aplicación FastAPI
 app = FastAPI(
-    title="RiskBase API",
-    description="API para la gestión de la base de riesgo",
+    title="API RiskBase",
+    description=(
+        "Bienvenido a la API de RiskBase. Esta plataforma te permite consultar, procesar y gestionar "
+        "toda la información relacionada con la base de riesgo de inventarios de la compañía. "
+        "A través de esta API podrás extraer datos directamente desde SAP, aplicar reglas de negocio "
+        "para el cálculo de provisiones y clasificaciones, y exportar los resultados en archivos Excel "
+        "para su análisis o integración con otros sistemas. Además, cuenta con mecanismos de autenticación "
+        "y control de acceso para garantizar la seguridad de la información. Si tienes dudas sobre cómo "
+        "utilizar los diferentes endpoints, consulta la documentación interactiva disponible en /docs."
+    ),
     version="1.0.0",
 )
 
@@ -21,8 +29,6 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://172.15.2.88:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -42,12 +48,15 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(api_router)
 
 
+host = os.getenv("API_HOST")
+port = int(os.getenv("API_PORT"))
 # Ruta raíz
 @app.get("/")
 async def root():
     return {
-        "message": "Bienvenido a la API de del proyecto APP_RiskBase",
-        "docs": "http://127.0.0.1:8000/docs",
+        "message": "Bienvenido a la API de del proyecto RiskBase",
+        "docs": f"http://{host}:{port}/docs",
         "version": "1.0.0",
         "status": "OK",
+        "autor": "Practicante planeación financiera",
     }

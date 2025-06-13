@@ -134,7 +134,7 @@ APP_RiskBase es una aplicación web especializada en la gestión integral de la 
 - **Lenguaje**: Python 3.11.8  
 - **Frameworks**: FastAPI (0.115.12), Django (5.1.7)  
 - **ORM / DB**: SQLAlchemy, pyodbc (SQL Server)  
-- **SAP**: pyrfc (3.3.1), sap_library  
+- **SAP**: pyrfc (3.3.1) 
 - **Auth**: JWT (python‑jose v3.4.0), passlib v1.7.4  
 - **Librerías**: pandas v2.2.3, numpy v2.2.4, openpyxl v3.1.5, python‑dotenv v1.1.0, requests, cryptography, bcrypt…  
 - **Servidor**: Uvicorn  
@@ -151,7 +151,7 @@ APP_RiskBase es una aplicación web especializada en la gestión integral de la 
 
 ## 📦 Instalación y Configuración
 
-Sigue estos pasos para instalar y configurar el proyecto **APP_RiskBase** (Backend y Frontend):
+Sigue estos pasos para instalar y configurar el proyecto **APP_RiskBase** (Backend y Frontend) en un entorno local:
 
 ### Backend
 
