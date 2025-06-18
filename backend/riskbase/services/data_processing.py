@@ -5,10 +5,7 @@ from datetime import datetime
 import os
 from sqlalchemy import create_engine
 
-# ----------------------------------------------#
-#           FUNCIONES DE MAPEO DE MARCAS        #
-# ----------------------------------------------#
-
+#* AQUÍ SE ENCUENTRAN TODAS LAS FUNCIONES DE MAPEO
 
 def insert_marks() -> Dict[str, str]:
     """
@@ -22,7 +19,7 @@ def insert_marks() -> Dict[str, str]:
         Dict[str, str]: Diccionario donde la clave es el nombre original de la marca QM
                         y el valor es el nombre concatenado o estandarizado.
     """
-    # TODO: Implementar el diccionario de marcas según la lógica de negocio
+    # TODO: Añadir, eliminar o modificar marcas según la lógica de negocio
     return {
         "ACCESORIOS": "ACCESORIOS",
         "ADIDAS": "ADIDAS",
@@ -128,6 +125,8 @@ def insert_subsegmentacion() -> Dict[str, str]:
         Dict[str, str]: Diccionario donde la clave es el nombre de la marca QM
                         y el valor es la categoría de subsegmentación asignada.
     """
+
+    # TODO: Añadir, eliminar o modificar subsegmentaciones según la lógica de negocio
     return {
         "ACCESORIOS": "OTROS",
         "ADIDAS": "OTROS",
@@ -232,7 +231,7 @@ def insert_segments() -> Dict[str, str]:
         Dict[str, str]: Diccionario donde la clave es el nombre de la marca QM
                         y el valor es la categoría de segmentación asignada.
     """
-    # TODO: Implementar el diccionario de segmentaciones según la lógica de negocio
+    # TODO: Añadir, eliminar o modificar segmentaciones según la lógica de negocio
     return {
         "ACCESORIOS": "EXPERTOS NO LOCALES",
         "ADIDAS": "EXPERTOS NO LOCALES",
@@ -324,10 +323,7 @@ def insert_segments() -> Dict[str, str]:
     }
 
 
-# ----------------------------------------------#
-#        FUNCIONES DE COLUMNAS FORMULADAS       #
-# ----------------------------------------------#
-
+#* AQUÍ PUEDES AÑADIR MÁS FUNCIONES DE COLUMNAS FORMULADAS SEGUN LO NECESITE LA LÓGICA DE NEGOCIO
 
 def calculate_rango_permanencia_column(row: pd.Series) -> str:
     """
@@ -674,9 +670,8 @@ def calculate_provision_column(row: pd.Series) -> float:
         return row["VALOR DEF"] * row["FACTOR PROV"]
 
 
-# ----------------------------------------------#
-#        LOGICA DE NEGOCIO PARA AVON Y NATURA   #
-# ----------------------------------------------#
+#* AQUÍ SE APLICA TODA LA LÓGICA DE NEGOCIO PARA AVON Y NATURA, MODIFICAR SEGÚN CONVENGA
+
 def calculate_avon_natura_factor_and_class(
     row: pd.Series, lookup_dict: dict
 ) -> tuple[float, str]:
@@ -752,10 +747,7 @@ def calculate_avon_natura_factor_and_class(
     return 0.0, "BAJO"
 
 
-# ----------------------------------------------#
-#        LOGICA DE NEGOCIO PARA OTRAS MARCAS    #
-# ----------------------------------------------#
-
+#* AQUÍ SE APLICA TODA LA LÓGICA DE NEGOCIO PARA EL RESTO DE MARCAS, MODIFICAR SEGÚN CONVENGA
 
 def lookup_dict_by_tipo(
     tipo_busqueda: str, lookup_dict: Dict[str, Tuple[float, str]]
@@ -899,10 +891,11 @@ def calculate_otros_marcas_factor_and_class(
     return 0.0, "BAJO"
 
 
-# ----------------------------------------------#
-#        FUNCIONES DE PROCESAMIENTO DE DATOS    #
-# ----------------------------------------------#
+#! PRIMERO REALIZAR PRUEBAS ANTES DE MODIFICAR LA LÓGICA TANTO PARA AVON Y NATURA COMO PARA EL RESTO DE MARCAS
 
+
+#* AQUÍ SE ENCUENTRAN LAS DOS FUNCIONES PARA EL PROCESAMIENTO DE LOS DATOS DE AVON Y NATURA Y EL RESTO DE MARCAS
+#TODO: CADA QUE SE CREA UNA COLUMNA FORMULADA DEBES DE AÑADIRLA A ESTAS FUNCIONES
 
 def process_dataframe_avon_natura(
     df_avon_natura: pd.DataFrame, df_matrices_avon_natura: pd.DataFrame
@@ -1147,10 +1140,7 @@ def process_dataframe_otras_marcas(
     return df_otras_marcas
 
 
-# ----------------------------------------------#
-#        FUNCION PARA UNIR LOS DATAFRAMES       #
-# ----------------------------------------------#
-
+#* AQUÍ SE ENCUENTRA LA FUNCION PARA UNIR LOS DATAFRAMES
 
 def combine_final_dataframes(
     df_final_avon_natura: pd.DataFrame, df_final_otras_marcas: pd.DataFrame

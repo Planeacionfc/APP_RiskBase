@@ -7,9 +7,8 @@ from datetime import datetime
 
 load_dotenv()
 
-# ----------------------------------------------#
-#           FUNCIONES DE CONEXIÓN A BD          #
-# ----------------------------------------------#
+#* AQUÍ SE ENCUENTRAN TODAS LAS FUNCIONES CON LAS QUE SE INTERACTÚA CON LA BASE DE DATOS
+#! NO ES NECESARIO REALIZAR MODIFICACIONES EN ESTAS FUNCIONES
 
 def get_sql_engine():
     """
@@ -68,11 +67,6 @@ def execute_query(query):
     return df
 
 
-
-# ----------------------------------------------#
-#           FUNCIONES DE CONSULTA A BD          #
-# ----------------------------------------------#
-
 def get_inventario_matriz():
     """
     Extrae todos los registros de la tabla InventarioMatriz.
@@ -114,11 +108,6 @@ def get_matrices_base_riesgo():
     """
     return execute_query(query)
 
-
-
-# ----------------------------------------------#
-#           FUNCIONES DE PROCESAMIENTO          #
-# ----------------------------------------------#
 
 def df_matrices_merge_raw():
     """
@@ -259,9 +248,6 @@ def df_matrices_otros_tipos():
 
 
 
-# ----------------------------------------------#
-#           FUNCIONES DE EXPORTACIÓN            #
-# ----------------------------------------------#
 
 def upload_dataframe_to_db(
     df_final_combined: pd.DataFrame

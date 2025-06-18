@@ -9,9 +9,8 @@ from dotenv import load_dotenv
 # Carga las variables de entorno desde el archivo .env
 load_dotenv()
 
-# ----------------------------------------------#
-#           CLASE DE CONEXIÓN A SAP             #
-# ----------------------------------------------#
+#* AQUÍ SE ENCUENTRAN TODAS LAS FUNCIONES CON LAS QUE SE INTERACTÚA CON SAP
+#! NO ES NECESARIO REALIZAR MODIFICACIONES EN ESTAS FUNCIONES
 
 class SAPConnection:
     def __init__(self, ashost, sysnr, client, user, passwd, lang):
@@ -290,9 +289,6 @@ class SAPConnection:
         })
         return df_final_cell_values
 
-# ----------------------------------------------#
-#           FUNCIONES DE EXTRACCIÓN DE SAP       #
-# ----------------------------------------------#
 
 def get_data_sap():
     """
@@ -307,7 +303,7 @@ def get_data_sap():
                       estandarizadas y datos convertidos a los tipos apropiados.
     """
     today = datetime.now()
-    month = today.strftime("%m.%Y")
+    month = today.strftime("%m.%Y") #! LA VISTA SOLO SE CONSULTA POR MES Y AÑO
 
     sap_conn = SAPConnection(
         ashost=os.getenv("ASHOST"),
@@ -452,9 +448,6 @@ def get_data_sap():
 
     return df_final_combined
 
-# ----------------------------------------------#
-#           FUNCIONES DE FILTRADO                #
-# ----------------------------------------------#
 
 def filter_avon_natura(df: pd.DataFrame) -> pd.DataFrame:
     """

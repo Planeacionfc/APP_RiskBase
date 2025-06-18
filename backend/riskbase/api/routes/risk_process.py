@@ -51,9 +51,90 @@ router = APIRouter(prefix="/risk", tags=["risk"])
 # Configuración del logger para este módulo
 logger = logging.getLogger(__name__)
 
+#* AQUÍ PUEDES AÑADIR O MODIFICAR ENDPOINTS DE LA BASE DE RIESGO
+#! TENER PRESENTE LOS PERMISOS DE USUARIO PARA CADA ENDPOINT
+
 # ============================================================================ #
 #          ENDPOINTS PARA ADMINISTRADORES Y USUARIOS REGULARES                 #
 # ============================================================================ #
+
+# Endpoint para ejecutar el proceso completo de extracción, transformación y carga de datos de base riesgo
+@router.post("/process", response_model=Dict[str, Any])
+async def process_riskbase(current_user: User = Depends(get_current_active_user)):
+    """
+    Ejecuta el proceso completo de extracción, transformación y carga de datos de riesgo.
+
+    Este endpoint realiza las siguientes operaciones:
+    1. Obtiene las matrices de configuración para AVON/NATURA y otros marcas
+    2. Extrae datos de SAP
+    3. Filtra y procesa los datos según el tipo de marca
+    4. Combina los resultados y genera un archivo Excel temporal
+
+    Permisos: Solo administradores
+
+    Returns:
+        Dict[str, Any]: Resultado del proceso con información sobre filas procesadas,
+        columnas y nombre del archivo temporal generado
+
+    Raises:
+        HTTPException: Si no se pueden obtener datos de SAP o si ocurre un error durante el proceso
+    """
+    logger.info(f"[process] Realizando el procesamiento de la base de riesgo")
+    try:
+        matrices_avon_natura = df_matrices_avon_natura()
+        matrices_otros_tipos = df_matrices_otros_tipos()
+
+        df_sap = get_data_sap()
+
+        if df_sap is None or df_sap.empty:
+            logger.error(f"[process] No se pudieron obtener los datos de SAP")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No se pudieron obtener datos de SAP",
+            )
+
+        # 2. Filtro para obtener solo los datos de AVON y NATURA
+        df_avon_natura = filter_avon_natura(df_sap)
+        # 3. Filtro para obtener los datos de otras marcas
+        df_otras_marcas = filter_marca_otros(df_sap)
+
+        df_final_avon_natura = process_dataframe_avon_natura(
+            df_avon_natura, matrices_avon_natura
+        )
+
+        df_final_otras_marcas = process_dataframe_otras_marcas(
+            df_otras_marcas, matrices_otros_tipos
+        )
+
+        df_final_combined = combine_final_dataframes(
+            df_final_avon_natura, df_final_otras_marcas
+        )
+
+        logger.info(f"[process] Generando archivo Excel temporal")
+        excel_file = f"Archivo_temporal_{datetime.now().strftime('%d-%m-%y_%H-%M')}.xlsx"
+        temp_dir = os.environ.get("TEMP_DIR")
+        os.makedirs(temp_dir, exist_ok=True)
+        excel_path = os.path.join(temp_dir, excel_file)
+        df_final_combined.to_excel(excel_path, index=False)
+        result = {
+            "success": True,
+            "message": "Proceso ejecutado correctamente",
+            "rows_processed": len(df_final_combined),
+            "columns": df_final_combined.columns.tolist(),
+            "excel_file": excel_file,
+            "summary": {
+                "total_records": len(df_final_combined),
+            },
+        }
+        logger.info(f"[process] Proceso de base de riesgo ejecutado correctamente")
+        return result
+    except Exception as e:
+        logger.error(f"[process] Error: {e}")
+        tb = traceback.format_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al ejecutar el proceso: {str(e)}\n{tb}",
+        )
 
 
 # Endpoint para consultar la base de riesgo por mes y año específicos
@@ -271,85 +352,6 @@ class FileNameRequest(BaseModel):
 # ============================================================================ #
 #             ENDPOINTS EXCLUSIVOS PARA ADMINISTRADORES                        #
 # ============================================================================ #
-
-
-# Endpoint para ejecutar el proceso completo de extracción, transformación y carga de datos de base riesgo
-@router.post("/process", response_model=Dict[str, Any])
-async def process_riskbase(current_user: User = Depends(get_current_active_user)):
-    """
-    Ejecuta el proceso completo de extracción, transformación y carga de datos de riesgo.
-
-    Este endpoint realiza las siguientes operaciones:
-    1. Obtiene las matrices de configuración para AVON/NATURA y otros marcas
-    2. Extrae datos de SAP
-    3. Filtra y procesa los datos según el tipo de marca
-    4. Combina los resultados y genera un archivo Excel temporal
-
-    Permisos: Solo administradores
-
-    Returns:
-        Dict[str, Any]: Resultado del proceso con información sobre filas procesadas,
-        columnas y nombre del archivo temporal generado
-
-    Raises:
-        HTTPException: Si no se pueden obtener datos de SAP o si ocurre un error durante el proceso
-    """
-    logger.info(f"[process] Realizando el procesamiento de la base de riesgo")
-    try:
-        matrices_avon_natura = df_matrices_avon_natura()
-        matrices_otros_tipos = df_matrices_otros_tipos()
-
-        df_sap = get_data_sap()
-
-        if df_sap is None or df_sap.empty:
-            logger.error(f"[process] No se pudieron obtener los datos de SAP")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No se pudieron obtener datos de SAP",
-            )
-
-        # 2. Filtro para obtener solo los datos de AVON y NATURA
-        df_avon_natura = filter_avon_natura(df_sap)
-        # 3. Filtro para obtener los datos de otras marcas
-        df_otras_marcas = filter_marca_otros(df_sap)
-
-        df_final_avon_natura = process_dataframe_avon_natura(
-            df_avon_natura, matrices_avon_natura
-        )
-
-        df_final_otras_marcas = process_dataframe_otras_marcas(
-            df_otras_marcas, matrices_otros_tipos
-        )
-
-        df_final_combined = combine_final_dataframes(
-            df_final_avon_natura, df_final_otras_marcas
-        )
-
-        logger.info(f"[process] Generando archivo Excel temporal")
-        excel_file = f"Archivo_temporal_{datetime.now().strftime('%d-%m-%y_%H-%M')}.xlsx"
-        temp_dir = os.environ.get("TEMP_DIR")
-        os.makedirs(temp_dir, exist_ok=True)
-        excel_path = os.path.join(temp_dir, excel_file)
-        df_final_combined.to_excel(excel_path, index=False)
-        result = {
-            "success": True,
-            "message": "Proceso ejecutado correctamente",
-            "rows_processed": len(df_final_combined),
-            "columns": df_final_combined.columns.tolist(),
-            "excel_file": excel_file,
-            "summary": {
-                "total_records": len(df_final_combined),
-            },
-        }
-        logger.info(f"[process] Proceso de base de riesgo ejecutado correctamente")
-        return result
-    except Exception as e:
-        logger.error(f"[process] Error: {e}")
-        tb = traceback.format_exc()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al ejecutar el proceso: {str(e)}\n{tb}",
-        )
 
 
 # Endpoint para guardar los datos procesados en la base de datos
