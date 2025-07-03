@@ -128,7 +128,7 @@ export default function CreateUsersPage() {
             value={form.username}
             onChange={handleChange}
             required
-            placeholder="ej: carlos.quiroz"
+            placeholder="ej: usuario.ejemplo"
             className="w-full px-3 py-2 border rounded focus:outline-none"
           />
         </div>
@@ -145,7 +145,7 @@ export default function CreateUsersPage() {
             value={form.email}
             onChange={handleChange}
             required
-            placeholder="ej: carlos@empresa.com"
+            placeholder="ej: usuario@empresa.com"
             className="w-full px-3 py-2 border rounded focus:outline-none"
           />
         </div>

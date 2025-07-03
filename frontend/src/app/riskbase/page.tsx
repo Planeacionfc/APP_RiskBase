@@ -446,14 +446,22 @@ export default function RiskBasePage() {
 
   return (
     <div className="flex flex-col items-center min-h-screen bg-white dark:bg-[#232836] px-15 py-10">
-      {/* Botón de retroceso */}
-      <div className="w-full flex justify-start mb-4">
+      {/* Botones de navegación */}
+      <div className="w-full flex justify-between mb-4">
         <button
           onClick={() => router.push('/')}
           className="px-6 py-2 bg-skyBlue hover:bg-[#4278FA]/90 dark:bg-bone dark:hover:bg-bone/90 text-white dark:text-black font-semibold rounded-lg shadow-md transition-colors duration-200 text-lg flex items-center gap-2"
         >
           &#8592; Volver al inicio
         </button>
+        <a 
+          href="MANUAL_USUARIO_APP_RISKBASE.pdf" 
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-6 py-2 bg-skyBlue hover:bg-[#4278FA]/90 dark:bg-bone dark:hover:bg-bone/90 text-white dark:text-black font-semibold rounded-lg shadow-md transition-colors duration-200 text-lg flex items-center gap-2"
+        >
+          📖 Manual de Usuario
+        </a>
       </div>
       <h1 className="text-3xl md:text-4xl font-bold mb-8 mt-2 text-center text-skyBlue dark:text-bone">Procesamiento de Base de Riesgo</h1>
       <p className="text-center text-gray-700 dark:text-gray-300 mb-8">
