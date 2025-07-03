@@ -27,7 +27,7 @@ from sqlalchemy import (
     insert,
     update as sqlalchemy_update,
 )
-import os
+import psutil, os, time
 from datetime import datetime
 from pydantic import BaseModel
 import traceback
@@ -61,6 +61,7 @@ logger = logging.getLogger(__name__)
 # Endpoint para ejecutar el proceso completo de extracción, transformación y carga de datos de base riesgo
 @router.post("/process", response_model=Dict[str, Any])
 async def process_riskbase(current_user: User = Depends(get_current_active_user)):
+
     """
     Ejecuta el proceso completo de extracción, transformación y carga de datos de riesgo.
 
@@ -79,6 +80,15 @@ async def process_riskbase(current_user: User = Depends(get_current_active_user)
     Raises:
         HTTPException: Si no se pueden obtener datos de SAP o si ocurre un error durante el proceso
     """
+    # Medir el uso de memoria y CPU al inicio del proceso
+    pid = os.getpid()
+    proc = psutil.Process(pid)
+    mem_start = proc.memory_info().rss / (1024*1024)
+    porcent_mem_start = proc.memory_percent()
+    cpu_start = proc.cpu_percent(interval=None)
+    t0 = time.perf_counter()
+    disk_usage = psutil.disk_usage("/").percent
+    
     logger.info(f"[process] Realizando el procesamiento de la base de riesgo")
     try:
         matrices_avon_natura = df_matrices_avon_natura()
@@ -116,17 +126,43 @@ async def process_riskbase(current_user: User = Depends(get_current_active_user)
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
         df_final_combined.to_excel(excel_path, index=False)
+
+        # Cálculo de métricas de rendimiento
+        t1 = time.perf_counter()
+        mem_end = proc.memory_info().rss / (1024*1024)
+        porcent_mem_end = proc.memory_percent()
+        cpu_end = proc.cpu_percent(interval=None)
+        
+        # Resultados del proceso
         result = {
             "success": True,
             "message": "Proceso ejecutado correctamente",
             "rows_processed": len(df_final_combined),
             "columns": df_final_combined.columns.tolist(),
             "excel_file": excel_file,
+            # Métricas de rendimiento
+            "performance_metrics": {
+                "cpu_usage_percent": round(cpu_end - cpu_start, 2),
+                "memory_usage_mb_start": round(mem_start, 2),
+                "memory_usage_mb_end": round(mem_end, 2),
+                "memory_usage_percent_final": round(porcent_mem_end - porcent_mem_start, 2),
+                "execution_time_seconds": round(t1 - t0, 2),
+                "disk_usage": disk_usage,
+            },
             "summary": {
                 "total_records": len(df_final_combined),
             },
         }
+        
+        # Log de métricas
         logger.info(f"[process] Proceso de base de riesgo ejecutado correctamente")
+        logger.info(f"[process] CPU usado: {result['performance_metrics']['cpu_usage_percent']:.2f}%")
+        logger.info(f"[process] Memoria usada al inicio: {result['performance_metrics']['memory_usage_mb_start']:.2f} MB")
+        logger.info(f"[process] Memoria usada al final: {result['performance_metrics']['memory_usage_mb_end']:.2f} MB")
+        logger.info(f"[process] Porcentaje de memoria usada: {result['performance_metrics']['memory_usage_percent_final']:.2f}%")
+        logger.info(f"[process] Porcentaje de disco usado: {result['performance_metrics']['disk_usage']:.2f}%")
+        logger.info(f"[process] Tiempo total de ejecución: {result['performance_metrics']['execution_time_seconds']:.2f} segundos")
+        
         return result
     except Exception as e:
         logger.error(f"[process] Error: {e}")
@@ -165,6 +201,15 @@ async def consult_riskbase(
     Raises:
         HTTPException: Si no se encuentran datos para el mes y año especificados o si ocurre un error
     """
+    # Medir el uso de memoria y CPU al inicio del proceso
+    pid = os.getpid()
+    proc = psutil.Process(pid)
+    mem_start = proc.memory_info().rss / (1024*1024)
+    porcent_mem_start = proc.memory_percent()
+    cpu_start = proc.cpu_percent(interval=None)
+    t0 = time.perf_counter()
+    disk_usage = psutil.disk_usage("/").percent
+    
     logger.info(
         f"[consult-riskbase] Usuario: {current_user.username} consultando base de riesgo para mes={mes}, año={anio}"
     )
@@ -184,19 +229,42 @@ async def consult_riskbase(
         os.makedirs(temp_dir, exist_ok=True)
         excel_path = os.path.join(temp_dir, excel_file)
         df_final_combined.to_excel(excel_path, index=False)
+        
+        # Cálculo de métricas de rendimiento
+        t1 = time.perf_counter()
+        mem_end = proc.memory_info().rss / (1024*1024)
+        porcent_mem_end = proc.memory_percent()
+        cpu_end = proc.cpu_percent(interval=None)
+        
         result = {
             "success": True,
             "message": "Consulta ejecutada correctamente",
             "rows_processed": len(df_final_combined),
             "columns": df_final_combined.columns.tolist(),
             "excel_file": excel_file,
+            # Métricas de rendimiento
+            "performance_metrics": {
+                "cpu_usage_percent": round(cpu_end - cpu_start, 2),
+                "memory_usage_mb_start": round(mem_start, 2),
+                "memory_usage_mb_end": round(mem_end, 2),
+                "memory_usage_percent_final": round(porcent_mem_end - porcent_mem_start, 2),
+                "execution_time_seconds": round(t1 - t0, 2),
+                "disk_usage": disk_usage,
+            },
             "summary": {
                 "total_records": len(df_final_combined),
             },
         }
-        logger.info(
-            f"[consult-riskbase] Consulta exitosa de información de la base de datos"
-        )
+        
+        # Log de métricas
+        logger.info(f"[consult-riskbase] Consulta exitosa de información de la base de datos")
+        logger.info(f"[consult-riskbase] CPU usado: {result['performance_metrics']['cpu_usage_percent']:.2f}%")
+        logger.info(f"[consult-riskbase] Memoria usada al inicio: {result['performance_metrics']['memory_usage_mb_start']:.2f} MB")
+        logger.info(f"[consult-riskbase] Memoria usada al final: {result['performance_metrics']['memory_usage_mb_end']:.2f} MB")
+        logger.info(f"[consult-riskbase] Porcentaje de memoria usada: {result['performance_metrics']['memory_usage_percent_final']:.2f}%")
+        logger.info(f"[consult-riskbase] Porcentaje de disco usado: {result['performance_metrics']['disk_usage']:.2f}%")
+        logger.info(f"[consult-riskbase] Tiempo total de ejecución: {result['performance_metrics']['execution_time_seconds']:.2f} segundos")
+        
         return result
     except Exception as e:
         logger.error(f"[consult-riskbase] Error: {e}")
@@ -378,6 +446,15 @@ async def save_to_database(
     Raises:
         HTTPException: Si el archivo no existe o hay error al guardarlo en la base de datos
     """
+    # Medir el uso de memoria y CPU al inicio del proceso
+    pid = os.getpid()
+    proc = psutil.Process(pid)
+    mem_start = proc.memory_info().rss / (1024*1024)
+    porcent_mem_start = proc.memory_percent()
+    cpu_start = proc.cpu_percent(interval=None)
+    t0 = time.perf_counter()
+    disk_usage = psutil.disk_usage("/").percent
+    
     logger.info(
         f"[save-to-db] Usuario: {current_user.username} guardando la información en la base de datos"
     )
@@ -391,13 +468,41 @@ async def save_to_database(
                 detail="Archivo temporal no encontrado. Ejecute el proceso primero.",
             )
         df = pd.read_excel(file_path)
+        
+        # Ejecutar la carga de datos
         upload_dataframe_to_db(df)
-        logger.info(f"[save-to-db] Datos guardados correctamente en la base de datos")
-        return {
+        
+        # Cálculo de métricas de rendimiento
+        t1 = time.perf_counter()
+        mem_end = proc.memory_info().rss / (1024*1024)
+        porcent_mem_end = proc.memory_percent()
+        cpu_end = proc.cpu_percent(interval=None)
+        
+        result = {
             "success": True,
             "message": "Datos guardados correctamente en la base de datos",
             "rows_saved": len(df),
+            # Métricas de rendimiento
+            "performance_metrics": {
+                "cpu_usage_percent": round(cpu_end - cpu_start, 2),
+                "memory_usage_mb_start": round(mem_start, 2),
+                "memory_usage_mb_end": round(mem_end, 2),
+                "memory_usage_percent_final": round(porcent_mem_end - porcent_mem_start, 2),
+                "execution_time_seconds": round(t1 - t0, 2),
+                "disk_usage": disk_usage,
+            }
         }
+        
+        # Log de métricas
+        logger.info(f"[save-to-db] Datos guardados correctamente en la base de datos")
+        logger.info(f"[save-to-db] CPU usado: {result['performance_metrics']['cpu_usage_percent']:.2f}%")
+        logger.info(f"[save-to-db] Memoria usada al inicio: {result['performance_metrics']['memory_usage_mb_start']:.2f} MB")
+        logger.info(f"[save-to-db] Memoria usada al final: {result['performance_metrics']['memory_usage_mb_end']:.2f} MB")
+        logger.info(f"[save-to-db] Porcentaje de memoria usada: {result['performance_metrics']['memory_usage_percent_final']:.2f}%")
+        logger.info(f"[save-to-db] Porcentaje de disco usado: {result['performance_metrics']['disk_usage']:.2f}%")
+        logger.info(f"[save-to-db] Tiempo total de ejecución: {result['performance_metrics']['execution_time_seconds']:.2f} segundos")
+        
+        return result
     except Exception as e:
         logger.error(f"[save-to-db] Error: {e}")
         raise HTTPException(
@@ -424,6 +529,15 @@ async def get_matrices(current_user: User = Depends(get_current_admin_user)):
     Raises:
         HTTPException: Si no se encuentran matrices o hay error al consultarlas
     """
+    # Medir el uso de memoria y CPU al inicio del proceso
+    pid = os.getpid()
+    proc = psutil.Process(pid)
+    mem_start = proc.memory_info().rss / (1024*1024)
+    porcent_mem_start = proc.memory_percent()
+    cpu_start = proc.cpu_percent(interval=None)
+    t0 = time.perf_counter()
+    disk_usage = psutil.disk_usage("/").percent
+    
     logger.info(
         f"[matrices-view] Usuario: {current_user.username} consultando matrices de base de riesgo"
     )
@@ -439,13 +553,38 @@ async def get_matrices(current_user: User = Depends(get_current_admin_user)):
 
         # Convertir a diccionario para la respuesta JSON
         matrices_dict = matrices.to_dict(orient="records")
-
-        logger.info(f"[matrices-view] Matrices consultadas correctamente")
-        return {
+        
+        # Cálculo de métricas de rendimiento
+        t1 = time.perf_counter()
+        mem_end = proc.memory_info().rss / (1024*1024)
+        porcent_mem_end = proc.memory_percent()
+        cpu_end = proc.cpu_percent(interval=None)
+        
+        result = {
             "matrices": matrices_dict,
             "total": len(matrices_dict),
             "columns": matrices.columns.tolist(),
+            # Métricas de rendimiento
+            "performance_metrics": {
+                "cpu_usage_percent": round(cpu_end - cpu_start, 2),
+                "memory_usage_mb_start": round(mem_start, 2),
+                "memory_usage_mb_end": round(mem_end, 2),
+                "memory_usage_percent_final": round(porcent_mem_end - porcent_mem_start, 2),
+                "execution_time_seconds": round(t1 - t0, 2),
+                "disk_usage": disk_usage,
+            }
         }
+        
+        # Log de métricas
+        logger.info(f"[matrices-view] Matrices consultadas correctamente")
+        logger.info(f"[matrices-view] CPU usado: {result['performance_metrics']['cpu_usage_percent']:.2f}%")
+        logger.info(f"[matrices-view] Memoria usada al inicio: {result['performance_metrics']['memory_usage_mb_start']:.2f} MB")
+        logger.info(f"[matrices-view] Memoria usada al final: {result['performance_metrics']['memory_usage_mb_end']:.2f} MB")
+        logger.info(f"[matrices-view] Porcentaje de memoria usada: {result['performance_metrics']['memory_usage_percent_final']:.2f}%")
+        logger.info(f"[matrices-view] Porcentaje de disco usado: {result['performance_metrics']['disk_usage']:.2f}%")
+        logger.info(f"[matrices-view] Tiempo total de ejecución: {result['performance_metrics']['execution_time_seconds']:.2f} segundos")
+        
+        return result
 
     except Exception as e:
         logger.error(f"[matrices-view] Error: {e}")
@@ -717,7 +856,7 @@ async def update_matrices(
         "errors": errors,
     }
 
-
+#* Este endpoint se dispara automaticamente cuando se guarda la información en la base de datos
 # Endpoint para eliminar un archivo temporal Excel
 @router.delete("/delete-temp-file")
 async def delete_temp_file(

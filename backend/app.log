@@ -1,2 +1,0 @@
-2025-06-18 08:35:51,031 [INFO] riskbase.api.routes.auth: [login] Iniciando sesión para el usuario: admin@prebel.com
-2025-06-18 08:35:51,965 [INFO] riskbase.api.routes.auth: [login] Token generado exitosamente para el usuario: admin
