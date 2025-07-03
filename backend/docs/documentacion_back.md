@@ -52,9 +52,28 @@ backend/
    ```
 4. Configurar las variables de entorno en el archivo `.env`:
    ```
-   DEBUG=True
-   SECRET_KEY=tu-clave-secreta
-   DATABASE_URL=tu-base-de-datos
+   # --- Credenciales de la base de datos ---
+   DB_SERVER=TU_SERVIDOR_SQL           # Nombre o IP del servidor SQL
+   DATABASE=TU_BASE_DE_DATOS           # Nombre de la base de datos
+   DB_USER=TU_USUARIO_SQL              # Usuario de la base de datos SQL
+   DB_PASSWORD=TU_PASSWORD_SQL         # Contraseña del usuario de la base de datos SQL
+
+   # --- Credenciales de SAP BI ---
+   ASHOST=TU_HOST_SAP                  # Host o dirección del servidor SAP
+   SYSNR=00                            # Número de sistema SAP 
+   CLIENT=000                          # Número de cliente SAP 
+   USER_SAP=TU_USUARIO_SAP             # Usuario de SAP
+   PASSWORD_SAP=TU_PASSWORD_SAP        # Contraseña del usuario SAP
+
+   # --- Configuración del API ---
+   API_HOST=tu_host                    # Host donde se ejecuta la API (por ejemplo, localhost)
+   API_PORT=tu_puerto                  # Puerto donde se ejecuta la API (por ejemplo, 8000)
+   TEMP_DIR=./temp                     # Ruta de la carpeta temporal donde se alojan los archivos de Excel
+
+   # --- Credenciales de autenticación JWT ---
+   SECRET_KEY=tu_clave_secreta_segura  # Clave secreta para firmar los tokens JWT
+   ALGORITHM=HS256                     # Algoritmo de cifrado para JWT (por ejemplo, HS256)
+   ACCESS_TOKEN_EXPIRE_MINUTES=30      # Tiempo de expiración del token de acceso en minutos
    ```
 
 5. Iniciar el servidor de desarrollo:
@@ -81,18 +100,17 @@ backend/
 
 ## Despliegue en Producción
 
-1. Crear un archivo .env con las siguientes variables en el backend:
-     API_HOST=0.0.0.0 o IP del servidor
-     API_PORT=8000
-     TEMP_DIR=/ruta/absoluta/a/temp
-     DB_USER=usuario
-     DB_PASSWORD=contraseña
-     DB_SERVER=servidor_sql
-     DATABASE=nombre_db
+1. Cambiar el archivo .env con las siguientes variables en el backend:
+
+   ```
+      API_HOST=0.0.0.0 o IP del servidor
+      API_PORT=puerto del backend
+   ```
 
 2. Configurar CORS en FastAPI:
-En el archivo principal (main.py), asegurarse de que los orígenes permitidos incluyan la IP y puerto del frontend:
+   En el archivo principal (main.py), asegurarse de que los orígenes permitidos incluyan la IP y puerto del frontend:
 
+   ```
    app.add_middleware(
       CORSMiddleware,
       allow_origins=[
@@ -102,6 +120,7 @@ En el archivo principal (main.py), asegurarse de que los orígenes permitidos in
       allow_methods=["*"],
       allow_headers=["*"],
    )
+   ```
 
 3. Iniciar el servidor de producción:
    ```bash
